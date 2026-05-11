@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CONTRIBUTING.md` and `AGENTS.md` codifying branching, PR, release, and code
   style rules for human and AI contributors.
 - PR template and issue forms (`bug_report`, `feature_request`) under `.github/`.
+- Documentation site (Docusaurus 3) under `website/` with source markdown in
+  `docs/`, deployed to GitHub Pages via `.github/workflows/docs.yml`. Covers
+  installation, configuration, filtering rules, API, operations, and
+  architecture.
+- `CLAUDE.md` at the repository root pointing Claude Code users at `AGENTS.md`.
 
 ## [0.1.0] - YYYY-MM-DD
 
