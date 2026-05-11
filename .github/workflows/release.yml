@@ -72,9 +72,15 @@ jobs:
           load: true
           tags: heimdall:smoke
 
+      # Mount the smoke-specific config that defines feeds with explicit allow/deny and
+      # age filters (relaxed, allow-newtonsoft, deny-newtonsoft, age-locked). The production
+      # config.yml is overridden only for the duration of the smoke run so the filter rules
+      # can be exercised against real api.nuget.org metadata.
       - name: Start Heimdall under test
         run: |
-          docker run -d --name heimdall-smoke -p 8080:8080 heimdall:smoke
+          docker run -d --name heimdall-smoke -p 8080:8080 \
+            -v "${GITHUB_WORKSPACE}/tests/Heimdall.SmokeTests/config.smoke.yml:/app/config.yml:ro" \
+            heimdall:smoke
           echo "container started: $(docker ps --filter name=heimdall-smoke --format '{{.ID}}')"
 
       # /healthz only checks the process is alive; /readyz hits every configured upstream
