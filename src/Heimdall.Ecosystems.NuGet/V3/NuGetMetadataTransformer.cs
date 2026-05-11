@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Heimdall.Application.Filtering;
-using Heimdall.Domain.Configuration;
-using Heimdall.Domain.Packages;
+using Heimdall.Core.Filtering;
+using Heimdall.Core.Configuration;
+using Heimdall.Core.Packages;
 using Heimdall.Ecosystems.NuGet.V3.Models;
 
 namespace Heimdall.Ecosystems.NuGet.V3;

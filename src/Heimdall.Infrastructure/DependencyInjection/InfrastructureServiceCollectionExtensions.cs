@@ -1,5 +1,5 @@
-using Heimdall.Application.Caching;
-using Heimdall.Application.Configuration;
+using Heimdall.Core.Caching;
+using Heimdall.Core.Configuration;
 using Heimdall.Infrastructure.Caching;
 using Heimdall.Infrastructure.Configuration;
 using Microsoft.Extensions.Caching.Memory;

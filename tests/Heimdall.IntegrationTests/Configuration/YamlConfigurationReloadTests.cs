@@ -1,4 +1,4 @@
-using Heimdall.Application.Configuration;
+using Heimdall.Core.Configuration;
 using Heimdall.Infrastructure.Configuration;
 using Heimdall.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;

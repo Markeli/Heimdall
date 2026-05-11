@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Heimdall.Application.DependencyInjection;
-using Heimdall.Application.Filtering;
-using Heimdall.Domain.Configuration;
+using Heimdall.Core.DependencyInjection;
+using Heimdall.Core.Filtering;
+using Heimdall.Core.Configuration;
 using Heimdall.Ecosystems.NuGet.V3;
 using Heimdall.Ecosystems.NuGet.V3.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +14,7 @@ public class NuGetMetadataTransformerTests
 
 	private static (NuGetMetadataTransformer, FeedConfig) Build(int minAgeDays)
 	{
-		var sp = new ServiceCollection().AddHeimdallApplication().BuildServiceProvider();
+		var sp = new ServiceCollection().AddHeimdallCore().BuildServiceProvider();
 		var transformer = new NuGetMetadataTransformer(
 			new NuGetUrlRewriter(new Uri("https://heimdall.local/")),
 			sp.GetRequiredService<IVersionListFilter>(),

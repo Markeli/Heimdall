@@ -1,4 +1,4 @@
-using Heimdall.Domain.Packages;
+using Heimdall.Core.Packages;
 using Heimdall.Ecosystems.NuGet.V3.Models;
 using Semver;
 

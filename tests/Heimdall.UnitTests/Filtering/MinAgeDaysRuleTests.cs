@@ -1,7 +1,7 @@
-using Heimdall.Application.Filtering;
-using Heimdall.Application.Filtering.Rules;
-using Heimdall.Domain.Configuration;
-using Heimdall.Domain.Packages;
+using Heimdall.Core.Filtering;
+using Heimdall.Core.Filtering.Rules;
+using Heimdall.Core.Configuration;
+using Heimdall.Core.Packages;
 using Semver;
 
 namespace Heimdall.UnitTests.Filtering;

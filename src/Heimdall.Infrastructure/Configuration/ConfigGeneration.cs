@@ -1,4 +1,4 @@
-using Heimdall.Application.Configuration;
+using Heimdall.Core.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Heimdall.Infrastructure.Configuration;

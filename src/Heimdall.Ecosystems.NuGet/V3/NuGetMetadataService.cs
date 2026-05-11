@@ -1,7 +1,6 @@
 using System.Text.Json;
-using Heimdall.Application.Caching;
-using Heimdall.Application.Configuration;
-using Heimdall.Domain.Configuration;
+using Heimdall.Core.Caching;
+using Heimdall.Core.Configuration;
 using Heimdall.Ecosystems.NuGet.V3.Models;
 
 namespace Heimdall.Ecosystems.NuGet.V3;

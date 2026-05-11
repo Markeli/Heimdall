@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<ItemGroup>
-		<ProjectReference Include="..\Heimdall.Application\Heimdall.Application.csproj" />
+		<ProjectReference Include="..\Heimdall.Core\Heimdall.Core.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

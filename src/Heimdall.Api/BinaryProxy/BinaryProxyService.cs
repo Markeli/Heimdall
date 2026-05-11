@@ -1,8 +1,7 @@
 using Heimdall.Api.Audit;
-using Heimdall.Application.Configuration;
-using Heimdall.Application.Filtering;
-using Heimdall.Domain.Filtering;
-using Heimdall.Domain.Packages;
+using Heimdall.Core.Configuration;
+using Heimdall.Core.Filtering;
+using Heimdall.Core.Packages;
 using Heimdall.Ecosystems.NuGet.V3;
 using Microsoft.AspNetCore.Mvc;
 using Semver;

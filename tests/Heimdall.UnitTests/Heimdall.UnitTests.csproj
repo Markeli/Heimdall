@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<ItemGroup>
-		<ProjectReference Include="..\..\src\Heimdall.Application\Heimdall.Application.csproj" />
+		<ProjectReference Include="..\..\src\Heimdall.Core\Heimdall.Core.csproj" />
 		<ProjectReference Include="..\..\src\Heimdall.Infrastructure\Heimdall.Infrastructure.csproj" />
 		<ProjectReference Include="..\..\src\Heimdall.Ecosystems.NuGet\Heimdall.Ecosystems.NuGet.csproj" />
 	</ItemGroup>

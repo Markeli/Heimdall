@@ -1,4 +1,4 @@
-using Heimdall.Application.Caching;
+using Heimdall.Core.Caching;
 
 namespace Heimdall.Infrastructure.Caching;
 

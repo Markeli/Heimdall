@@ -1,4 +1,4 @@
-using Heimdall.Domain.Configuration;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.Infrastructure.Configuration;
 

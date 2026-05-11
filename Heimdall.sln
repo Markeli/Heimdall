@@ -2,9 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Heimdall.Domain", "src\Heimdall.Domain\Heimdall.Domain.csproj", "{7FCBFBD8-A58E-48C5-9B8C-48921C271670}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Heimdall.Application", "src\Heimdall.Application\Heimdall.Application.csproj", "{1395CA03-F54E-4906-BCDF-E4A5E334508B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Heimdall.Core", "src\Heimdall.Core\Heimdall.Core.csproj", "{1395CA03-F54E-4906-BCDF-E4A5E334508B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Heimdall.Infrastructure", "src\Heimdall.Infrastructure\Heimdall.Infrastructure.csproj", "{B851DA13-9CAA-471C-A5EC-12B4200C1A1F}"
 EndProject
@@ -28,18 +26,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Debug|x64.Build.0 = Debug|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Debug|x86.Build.0 = Debug|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Release|x64.ActiveCfg = Release|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Release|x64.Build.0 = Release|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Release|x86.ActiveCfg = Release|Any CPU
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670}.Release|x86.Build.0 = Release|Any CPU
 		{1395CA03-F54E-4906-BCDF-E4A5E334508B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1395CA03-F54E-4906-BCDF-E4A5E334508B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1395CA03-F54E-4906-BCDF-E4A5E334508B}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -117,7 +103,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{7FCBFBD8-A58E-48C5-9B8C-48921C271670} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{1395CA03-F54E-4906-BCDF-E4A5E334508B} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{B851DA13-9CAA-471C-A5EC-12B4200C1A1F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{C730FDF9-ADB3-450E-98BA-745DE90F03ED} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}

@@ -1,6 +1,5 @@
-using Heimdall.Application.Filtering;
-using Heimdall.Domain.Filtering;
-using Heimdall.Domain.Packages;
+using Heimdall.Core.Filtering;
+using Heimdall.Core.Packages;
 using NSubstitute;
 using Semver;
 

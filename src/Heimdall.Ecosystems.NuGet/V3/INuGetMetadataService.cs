@@ -1,4 +1,4 @@
-using Heimdall.Domain.Configuration;
+using Heimdall.Core.Configuration;
 using Heimdall.Ecosystems.NuGet.V3.Models;
 
 namespace Heimdall.Ecosystems.NuGet.V3;

@@ -1,7 +1,7 @@
 using Heimdall.Api.Audit;
 using Heimdall.Api.BinaryProxy;
 using Heimdall.Api.Health;
-using Heimdall.Application.DependencyInjection;
+using Heimdall.Core.DependencyInjection;
 using Heimdall.Ecosystems.NuGet.DependencyInjection;
 using Heimdall.Infrastructure.DependencyInjection;
 using Prometheus;
@@ -27,7 +27,7 @@ builder.Services.AddHttpClient("Heimdall.Health");
 builder.Services.AddHealthChecks()
 	.AddCheck<UpstreamReadinessCheck>("upstream", tags: ["ready"]);
 
-builder.Services.AddHeimdallApplication();
+builder.Services.AddHeimdallCore();
 builder.Services.AddHeimdallInfrastructure(builder.Configuration);
 builder.Services.AddNuGetEcosystem();
 builder.Services.AddSingleton<AuditLogger>();
