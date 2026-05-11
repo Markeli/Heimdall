@@ -1,8 +1,6 @@
-using Heimdall.Core.Caching;
 using Heimdall.Core.Configuration;
-using Heimdall.Infrastructure.Caching;
 using Heimdall.Infrastructure.Configuration;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -16,9 +14,10 @@ namespace Heimdall.Infrastructure.DependencyInjection;
 public static class InfrastructureServiceCollectionExtensions
 {
 	/// <summary>
-	/// Registers Heimdall infrastructure services: options binding and validation,
-	/// the in-process memory cache, the L1/L2 hybrid metadata cache, the config
-	/// generation counter, the snapshot provider, and the feed config lookup.
+	/// Registers Heimdall infrastructure services: options binding and validation, the
+	/// <see cref="HybridCache"/> with an in-memory <c>IDistributedCache</c> stub L2 (replace with
+	/// AddStackExchangeRedisCache when Redis lands), the config generation counter, the snapshot
+	/// provider, and the feed config lookup.
 	/// </summary>
 	/// <param name="services">Target service collection.</param>
 	/// <param name="configuration">Configuration root containing the <c>heimdall</c> section.</param>
@@ -37,16 +36,17 @@ public static class InfrastructureServiceCollectionExtensions
 
 		services.AddSingleton<IValidateOptions<HeimdallOptions>, HeimdallOptionsValidator>();
 
-		services.AddMemoryCache();
-
-		services.TryAddSingleton<ICacheLayer>(sp =>
-			new MemoryCacheL1(sp.GetRequiredService<IMemoryCache>()));
-
-		services.TryAddSingleton<IMetadataCache>(sp =>
+		// AddDistributedMemoryCache provides an in-memory IDistributedCache; HybridCache uses it as
+		// its L2 stub. Swap to AddStackExchangeRedisCache(...) when a real shared cache is ready —
+		// the HybridCache contract above (and every consumer) stays unchanged.
+		services.AddDistributedMemoryCache();
+		services.AddHybridCache(opts =>
 		{
-			var l1 = sp.GetRequiredService<ICacheLayer>();
-			var l2 = new NullDistributedCacheL2();
-			return new HybridMetadataCache(l1, l2);
+			opts.DefaultEntryOptions = new HybridCacheEntryOptions
+			{
+				LocalCacheExpiration = TimeSpan.FromMinutes(1),
+				Expiration = TimeSpan.FromMinutes(5),
+			};
 		});
 
 		services.TryAddSingleton<IConfigGeneration, ConfigGeneration>();

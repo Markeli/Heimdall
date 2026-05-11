@@ -1,13 +1,13 @@
 using System.Text.Json;
-using Heimdall.Core.Caching;
 using Heimdall.Core.Configuration;
 using Heimdall.Ecosystems.NuGet.V3.Models;
+using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Heimdall.Ecosystems.NuGet.V3;
 
 /// <summary>
 /// Default <see cref="INuGetV3MetadataService"/>: orchestrates upstream fetches, runs configured filters,
-/// rewrites URLs through Heimdall, and memoizes registration documents in <see cref="IMetadataCache"/>.
+/// rewrites URLs through Heimdall, and memoizes registration documents via <see cref="HybridCache"/>.
 /// </summary>
 public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 {
@@ -16,7 +16,7 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 	private readonly IFeedConfigLookup _lookup;
 	private readonly IConfigSnapshotProvider _snapshots;
 	private readonly INuGetV3UpstreamClient _upstream;
-	private readonly IMetadataCache _cache;
+	private readonly HybridCache _cache;
 	private readonly NuGetV3MetadataTransformer _transformer;
 	private readonly NuGetV3UrlRewriter _urls;
 
@@ -26,7 +26,7 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 	/// <param name="lookup">Lookup for feed configuration by ecosystem and feed name.</param>
 	/// <param name="snapshots">Provider of monotonic configuration snapshots used to key the cache.</param>
 	/// <param name="upstream">Typed upstream HTTP client.</param>
-	/// <param name="cache">Per-feed metadata cache.</param>
+	/// <param name="cache">Hybrid (L1 + optional L2) cache for registration documents. Provides stampede protection.</param>
 	/// <param name="transformer">Filter-and-rewrite transformer.</param>
 	/// <param name="urls">Heimdall-facing URL rewriter.</param>
 	/// <exception cref="ArgumentNullException">Thrown when any dependency is null.</exception>
@@ -34,7 +34,7 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 		IFeedConfigLookup lookup,
 		IConfigSnapshotProvider snapshots,
 		INuGetV3UpstreamClient upstream,
-		IMetadataCache cache,
+		HybridCache cache,
 		NuGetV3MetadataTransformer transformer,
 		NuGetV3UrlRewriter urls)
 	{
@@ -169,21 +169,18 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 		// Including the snapshot generation in the cache key invalidates entries automatically
 		// whenever feed configuration changes. Package IDs are lowercased to match NuGet's normalization.
 		var key = $"g{snapshot.Generation}:{Ecosystem}:{feedName}:reg:{packageId.ToLowerInvariant()}";
-		var cached = await _cache.GetAsync<RegistrationIndexV3>(key, ct);
-		if (cached is not null)
-		{
-			return cached;
-		}
 
-		var fetched = await _upstream.GetRegistrationAsync(feed.Upstream, packageId, ct);
-		if (fetched is null)
+		var entryOptions = new HybridCacheEntryOptions
 		{
-			return null;
-		}
+			Expiration = feed.CacheTtl ?? TimeSpan.FromMinutes(5),
+		};
 
-		var ttl = feed.CacheTtl ?? TimeSpan.FromMinutes(5);
-		await _cache.SetAsync(key, fetched, ttl, ct);
-		return fetched;
+		// HybridCache provides stampede protection: only one concurrent miss runs the factory.
+		return await _cache.GetOrCreateAsync<RegistrationIndexV3?>(
+			key,
+			async cancellationToken => await _upstream.GetRegistrationAsync(feed.Upstream, packageId, cancellationToken),
+			entryOptions,
+			cancellationToken: ct);
 	}
 
 	private FeedConfig RequireFeed(string feedName)
