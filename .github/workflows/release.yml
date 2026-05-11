@@ -72,14 +72,32 @@ jobs:
           load: true
           tags: heimdall:smoke
 
-      # Mount the smoke-specific config that defines feeds with explicit allow/deny and
-      # age filters (relaxed, allow-newtonsoft, deny-newtonsoft, age-locked). The production
-      # config.yml is overridden only for the duration of the smoke run so the filter rules
+      # Compute the age-locked feed's minAgeDays threshold from a real publication
+      # anchor (Newtonsoft.Json 12.0.3, published 2019-11-09T01:27:30Z): threshold =
+      # (now - published).days + 1 guarantees the rule rejects 12.0.3 (and every
+      # younger version) on every CI run, regardless of when the release is cut.
+      - name: Render smoke config with dynamic age threshold
+        env:
+          ANCHOR_PUBLISHED_AT: "2019-11-09T01:27:30Z"
+        run: |
+          set -euo pipefail
+          published_epoch=$(date -u -d "$ANCHOR_PUBLISHED_AT" +%s)
+          now_epoch=$(date -u +%s)
+          age_days=$(( (now_epoch - published_epoch) / 86400 ))
+          age_lock_days=$(( age_days + 1 ))
+          echo "Newtonsoft.Json 12.0.3 age=${age_days}d; minAgeDays threshold=${age_lock_days}d"
+          AGE_LOCK_DAYS="$age_lock_days" envsubst '$AGE_LOCK_DAYS' \
+            < tests/Heimdall.SmokeTests/config.smoke.yml \
+            > /tmp/heimdall.smoke.yml
+          grep -E 'name:|days:' /tmp/heimdall.smoke.yml
+
+      # Mount the rendered smoke config (with the computed age threshold) over the
+      # production config.yml for the duration of the smoke run so the filter rules
       # can be exercised against real api.nuget.org metadata.
       - name: Start Heimdall under test
         run: |
           docker run -d --name heimdall-smoke -p 8080:8080 \
-            -v "${GITHUB_WORKSPACE}/tests/Heimdall.SmokeTests/config.smoke.yml:/app/config.yml:ro" \
+            -v /tmp/heimdall.smoke.yml:/app/config.yml:ro \
             heimdall:smoke
           echo "container started: $(docker ps --filter name=heimdall-smoke --format '{{.ID}}')"
 

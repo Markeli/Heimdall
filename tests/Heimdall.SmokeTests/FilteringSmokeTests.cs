@@ -14,13 +14,19 @@ namespace Heimdall.SmokeTests;
 /// </summary>
 public sealed class FilteringSmokeTests : IClassFixture<NuGetSmokeTests.PingFixture>
 {
-	// Newtonsoft.Json 13.0.3 was published 2023-03-08. As of the foreseeable future of this
-	// repo it is older than every minAgeDays threshold short of `99999` and survives any
-	// `Newtonsoft.*` allow pattern, which makes it the canonical "real but easily targeted"
-	// package for these tests.
+	// Newtonsoft.Json 13.0.3 (published 2023-03-08) survives the allow/deny pattern tests
+	// because they care about id matching, not age. Used for everything except the age
+	// filter, where we anchor the threshold to v12.0.3 instead.
 	private const string TargetPackage = "Newtonsoft.Json";
 	private const string TargetPackageLower = "newtonsoft.json";
 	private const string TargetVersion = "13.0.3";
+
+	// Age-filter anchor: Newtonsoft.Json 12.0.3 was published 2019-11-09T01:27:30Z (see
+	// api.nuget.org registration). Release CI computes the age-locked feed's minAgeDays as
+	// (now - this date).days + 1 and injects it via envsubst — so the rule always rejects
+	// this specific version, no magic numbers, no time-dependent flakiness.
+	private const string AgeAnchorVersion = "12.0.3";
+	private const string AgeAnchorPublishedAt = "2019-11-09T01:27:30Z";
 
 	// Dapper is widely mirrored, has many shipped versions, and crucially does not match the
 	// `Newtonsoft.*` allow pattern — so it is the right "control" package for the allow-list
@@ -93,23 +99,25 @@ public sealed class FilteringSmokeTests : IClassFixture<NuGetSmokeTests.PingFixt
 	}
 
 	[Fact]
-	public async Task MinAgeDays_blocks_listing_when_threshold_unreachable()
+	public async Task MinAgeDays_blocks_listing_anchored_to_real_publish_date()
 	{
 		using var http = SmokeEnvironment.CreateClient();
 		var versions = await GetVersionsAsync(http, "age-locked", TargetPackageLower);
 		versions.Should().BeEmpty(
-			"age-locked requires minAgeDays=99999; no real package is that old, listing must be empty");
+			$"age-locked sets minAgeDays = age({AgeAnchorVersion}, anchor {AgeAnchorPublishedAt}) + 1 day, "
+			+ "so every Newtonsoft.Json version (including the anchor) must be filtered from listing");
 	}
 
 	[Fact]
-	public async Task MinAgeDays_blocks_download_when_threshold_unreachable()
+	public async Task MinAgeDays_blocks_download_of_real_anchor_version()
 	{
 		using var http = SmokeEnvironment.CreateClient();
-		var path = $"/nuget/age-locked/v3/flatcontainer/{TargetPackageLower}/{TargetVersion}"
-			+ $"/{TargetPackageLower}.{TargetVersion}.nupkg";
+		var path = $"/nuget/age-locked/v3/flatcontainer/{TargetPackageLower}/{AgeAnchorVersion}"
+			+ $"/{TargetPackageLower}.{AgeAnchorVersion}.nupkg";
 		using var resp = await Retry.GetAsync(http, path);
 		resp.StatusCode.Should().Be(HttpStatusCode.Forbidden,
-			"Newtonsoft.Json 13.0.3 (2023) is far younger than 99999 days, download must be denied");
+			$"the rule's threshold is set to age({AgeAnchorVersion}) + 1 day, so the anchor version "
+			+ "is by construction one day too young to be served");
 	}
 
 	private static async Task<List<string>> GetVersionsAsync(HttpClient http, string feed, string pkgLower)

@@ -16,9 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   container in release CI): `allowDeny` allow-pattern admits matching packages
   and blocks non-matching ones in both listing and download; `allowDeny`
   deny-pattern blocks matching packages and lets non-matching through; an
-  `age-locked` feed with `minAgeDays=99999` rejects every version of every
-  real package in both listing and download. Deliberately kept out of
-  `Heimdall.sln` so `dotnet cake --target=Test` does not pull it in.
+  `age-locked` feed whose `minAgeDays` is computed at smoke-run time as
+  `(now − Newtonsoft.Json 12.0.3 published date) + 1 day` (anchor:
+  2019-11-09) and injected via `envsubst`, so the rule always rejects the
+  anchor version in both listing and download — no magic numbers, no
+  time-dependent drift. Deliberately kept out of `Heimdall.sln` so
+  `dotnet cake --target=Test` does not pull it in.
 - `samples/nuget-consumer/`: a minimal project whose `NuGet.config` points
   exclusively at Heimdall, used by release CI to validate that `dotnet restore`
   works end-to-end through the proxy.
