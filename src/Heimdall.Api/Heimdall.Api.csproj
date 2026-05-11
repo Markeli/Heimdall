@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+	<ItemGroup>
+		<ProjectReference Include="..\Heimdall.Ecosystems.NuGet\Heimdall.Ecosystems.NuGet.csproj" />
+		<ProjectReference Include="..\Heimdall.Infrastructure\Heimdall.Infrastructure.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Serilog.AspNetCore" />
+		<PackageReference Include="Serilog.Sinks.Console" />
+		<PackageReference Include="prometheus-net.AspNetCore" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="heimdall.yaml" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+</Project>

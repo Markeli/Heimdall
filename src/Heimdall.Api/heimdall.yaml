@@ -1,0 +1,38 @@
+heimdall:
+  server:
+    listen: "http://0.0.0.0:8080"
+    publicBaseUrl: "http://localhost:8080"
+  cache:
+    l1:
+      defaultTtl: "00:05:00"
+    l2:
+      provider: "none"
+  ecosystems:
+    nuget:
+      feeds:
+        - name: strict
+          upstream: "https://api.nuget.org/v3/index.json"
+          cacheTtl: "00:10:00"
+          rules:
+            - type: minAgeDays
+              days: "14"
+            - type: allowDeny
+              patterns: "Microsoft.*;System.*;Newtonsoft.*;Serilog.*;Polly.*;Microsoft.AspNetCore.*"
+        - name: relaxed
+          upstream: "https://api.nuget.org/v3/index.json"
+          cacheTtl: "00:02:00"
+          rules:
+            - type: minAgeDays
+              days: "1"
+  observability:
+    metrics:
+      path: "/metrics"
+    audit:
+      enabled: true
+
+Serilog:
+  MinimumLevel:
+    Default: "Information"
+    Override:
+      "Microsoft": "Warning"
+      "Heimdall.Audit": "Information"
