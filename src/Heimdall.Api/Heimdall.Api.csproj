@@ -11,6 +11,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<None Update="heimdall.yaml" CopyToOutputDirectory="PreserveNewest" />
+		<None Update="config.yml" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 </Project>

@@ -510,3 +510,7 @@ FodyWeavers.xsd
 # End of https://www.toptal.com/developers/gitignore/api/rider,visualstudio,visualstudiocode,cake,dotnetcore
 
 .idea/
+
+# Heimdall: local untracked secrets — opt-in companion to config.yml
+**/config.secret.yml
+**/config.secret.*.yml

@@ -15,12 +15,14 @@ using IPNetwork = System.Net.IPNetwork;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Order matters: base YAML loads first, the per-environment file overrides it, and HEIMDALL_* env
-// vars override both so deployments can tune settings without rebuilding the image.
+// Order matters: base config loads first, the per-environment file overrides it, the optional
+// untracked secret file overrides those, and HEIMDALL_* env vars override everything so deployments
+// can tune settings without rebuilding the image.
 builder.Configuration
 	.SetBasePath(builder.Environment.ContentRootPath)
-	.AddYamlFile("heimdall.yaml", optional: true, reloadOnChange: true)
-	.AddYamlFile($"heimdall.{builder.Environment.EnvironmentName}.yaml", optional: true, reloadOnChange: true)
+	.AddYamlFile("config.yml", optional: true, reloadOnChange: true)
+	.AddYamlFile($"config.{builder.Environment.EnvironmentName}.yml", optional: true, reloadOnChange: true)
+	.AddYamlFile("config.secret.yml", optional: true, reloadOnChange: true)
 	.AddEnvironmentVariables(prefix: "HEIMDALL_");
 
 builder.Host.UseSerilog((ctx, lc) => lc

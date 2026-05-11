@@ -17,7 +17,7 @@ public class YamlConfigurationReloadTests : IDisposable
 	{
 		_tempDir = Path.Combine(Path.GetTempPath(), "heimdall-yaml-" + Guid.NewGuid().ToString("N"));
 		Directory.CreateDirectory(_tempDir);
-		_yamlPath = Path.Combine(_tempDir, "heimdall.yaml");
+		_yamlPath = Path.Combine(_tempDir, "config.yml");
 	}
 
 	public void Dispose()
@@ -39,7 +39,7 @@ public class YamlConfigurationReloadTests : IDisposable
 
 		var configuration = new ConfigurationBuilder()
 			.SetBasePath(_tempDir)
-			.AddYamlFile("heimdall.yaml", optional: false, reloadOnChange: true)
+			.AddYamlFile("config.yml", optional: false, reloadOnChange: true)
 			.Build();
 
 		var services = new ServiceCollection();

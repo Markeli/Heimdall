@@ -30,7 +30,7 @@ tests/
 dotnet run --project src/Heimdall.Api
 ```
 
-The server listens on `http://localhost:8080`. Configuration sits next to `Heimdall.Api.dll` (`heimdall.yaml`). The file is hot-reloaded on change.
+The server listens on `http://localhost:8080`. Configuration sits next to `Heimdall.Api.dll` as `config.yml`, with optional `config.{Environment}.yml` and `config.secret.yml` (gitignored) overrides on top. All files are hot-reloaded on change.
 
 ## Wiring up a client
 
@@ -96,7 +96,7 @@ dotnet test
 
 ```sh
 docker build -f src/Heimdall.Api/Dockerfile -t heimdall:dev .
-docker run --rm -p 8080:8080 -v $(pwd)/heimdall.yaml:/app/heimdall.yaml heimdall:dev
+docker run --rm -p 8080:8080 -v $(pwd)/config.yml:/app/config.yml heimdall:dev
 ```
 
 ## Out of scope (MVP)
