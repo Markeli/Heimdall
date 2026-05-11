@@ -1,8 +1,13 @@
 # Heimdall
 
 ![CI](https://github.com/Markeli/Heimdall/actions/workflows/ci.yml/badge.svg)
+![docs](https://github.com/Markeli/Heimdall/actions/workflows/docs.yml/badge.svg)
 
 Internal proxy for public package repositories (NuGet — MVP; npm/Maven later) with filtering rules (minimum version age, allow/deny by package name). Package files are streamed through; metadata is cached in memory.
+
+## Documentation
+
+Full documentation is published at <https://markeli.github.io/Heimdall/> (built from [`docs/`](docs/) via Docusaurus 3 — see [`website/`](website/)). The README below stays as a quick reference; the site goes deeper on configuration, rules, the API, operations, and architecture.
 
 ## Stack
 

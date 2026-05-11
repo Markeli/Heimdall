@@ -26,6 +26,10 @@ for prose and rationale. If anything here conflicts with `CONTRIBUTING.md`,
   such changes in the PR body.
 - MUST NOT delete and re-push a release tag. If a release fails, open a fix PR
   and tag the next patch version.
+- MUST keep documentation source in [`docs/`](docs/), not in `website/docs/`.
+  The Docusaurus site under [`website/`](website/) reads from `../docs`.
+  MUST NOT mass-duplicate `README.md` content into `docs/` — the site
+  expands on README, it does not mirror it.
 
 ## Workflow
 

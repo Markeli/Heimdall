@@ -61,6 +61,22 @@ Container build (matches the release pipeline exactly):
 docker build -f src/Heimdall.Api/Dockerfile -t heimdall:dev .
 ```
 
+### Working on docs
+
+The documentation site is a Docusaurus 3 project under [`website/`](website/);
+source markdown lives in [`docs/`](docs/). Local loop:
+
+```sh
+cd website
+npm ci
+npm start          # local preview at http://localhost:3000/Heimdall/
+npm run build      # what CI runs (onBrokenLinks: "throw")
+```
+
+Node 20 LTS — see [`website/.nvmrc`](website/.nvmrc). Prefix doc-only PR
+titles with `[docs]` so reviewers know not to expect a behaviour change
+(informational, not enforced).
+
 ## 5. Releasing
 
 Heimdall uses [Semantic Versioning](https://semver.org/) with
@@ -119,6 +135,10 @@ so they aren't forgotten:
   checks `ci/build` and `ci/changelog-guard`, disallow force-pushes and direct
   pushes.
 - **Settings → Actions → General**: "Workflow permissions" = *Read and write*.
+- **Settings → Pages → Source**: *"GitHub Actions"*. Required for the
+  `docs` workflow to deploy `https://markeli.github.io/Heimdall/`. Without
+  this the deploy job's OIDC handshake fails and the site is never
+  published.
 - **After the first release**: link the GHCR package
   (`ghcr.io/markeli/heimdall`) to this repository and set its visibility to
   public if external pulls are intended; otherwise leave it private.

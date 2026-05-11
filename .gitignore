@@ -14,6 +14,13 @@ obj/
 /node_modules
 /wwwroot/node_modules
 
+### Docusaurus website ###
+website/node_modules/
+website/build/
+website/.docusaurus/
+website/.cache-loader/
+# website/package-lock.json is intentionally committed for reproducible `npm ci` in CI.
+
 ### Rider ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
