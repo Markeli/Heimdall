@@ -1,5 +1,7 @@
 using Heimdall.Ecosystems.NuGet.V3;
+using Heimdall.Infrastructure.Configuration;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Heimdall.Api.Controllers;
 
@@ -12,16 +14,20 @@ namespace Heimdall.Api.Controllers;
 public sealed class NuGetV3MetadataController : ControllerBase
 {
 	private readonly INuGetV3MetadataService _service;
+	private readonly IOptionsMonitor<HeimdallOptions> _options;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="NuGetV3MetadataController"/> class.
 	/// </summary>
 	/// <param name="service">Service that builds and fetches NuGet v3 metadata documents.</param>
-	/// <exception cref="ArgumentNullException">Thrown when <paramref name="service"/> is null.</exception>
-	public NuGetV3MetadataController(INuGetV3MetadataService service)
+	/// <param name="options">Live options monitor used to read tunable search defaults on each request.</param>
+	/// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
+	public NuGetV3MetadataController(INuGetV3MetadataService service, IOptionsMonitor<HeimdallOptions> options)
 	{
 		ArgumentNullException.ThrowIfNull(service);
+		ArgumentNullException.ThrowIfNull(options);
 		_service = service;
+		_options = options;
 	}
 
 	/// <summary>
@@ -136,7 +142,7 @@ public sealed class NuGetV3MetadataController : ControllerBase
 
 		if (take <= 0)
 		{
-			take = 20;
+			take = _options.CurrentValue.Server.Search.DefaultTake;
 		}
 
 		var json = await _service.SearchJsonAsync(feed, query, skip, take, prerelease, ct);

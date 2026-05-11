@@ -1,11 +1,17 @@
+using System.Net;
 using Heimdall.Api.Audit;
 using Heimdall.Api.BinaryProxy;
 using Heimdall.Api.Health;
 using Heimdall.Core.DependencyInjection;
 using Heimdall.Ecosystems.NuGet.DependencyInjection;
+using Heimdall.Infrastructure.Configuration;
 using Heimdall.Infrastructure.DependencyInjection;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Options;
 using Prometheus;
 using Serilog;
+using AspNetForwardedHeadersOptions = Microsoft.AspNetCore.Builder.ForwardedHeadersOptions;
+using IPNetwork = System.Net.IPNetwork;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +42,28 @@ builder.Services.AddSingleton<AuditLogger>();
 builder.Services.AddSingleton<NuGetV3BinaryProxyService>();
 
 var app = builder.Build();
+
+// Honour X-Forwarded-* when at least one proxy/network is configured. Without explicit trust Kestrel
+// falls back to its loopback-only default, which is safer than blindly accepting forwarded values.
+var forwarded = app.Services.GetRequiredService<IOptions<HeimdallOptions>>().Value.Server.ForwardedHeaders;
+if (forwarded.KnownProxies.Count > 0 || forwarded.KnownNetworks.Count > 0)
+{
+	var aspOptions = new AspNetForwardedHeadersOptions
+	{
+		ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+	};
+	aspOptions.KnownProxies.Clear();
+	aspOptions.KnownIPNetworks.Clear();
+	foreach (var raw in forwarded.KnownProxies)
+	{
+		aspOptions.KnownProxies.Add(IPAddress.Parse(raw));
+	}
+	foreach (var raw in forwarded.KnownNetworks)
+	{
+		aspOptions.KnownIPNetworks.Add(IPNetwork.Parse(raw));
+	}
+	app.UseForwardedHeaders(aspOptions);
+}
 
 app.UseExceptionHandler();
 app.UseSerilogRequestLogging();

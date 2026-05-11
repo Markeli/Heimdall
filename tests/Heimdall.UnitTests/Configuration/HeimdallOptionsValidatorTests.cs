@@ -98,4 +98,51 @@ public class HeimdallOptionsValidatorTests
 		var result = validator.Validate(null, opts);
 		result.Failed.Should().BeTrue();
 	}
+
+	[Theory]
+	[InlineData(0)]
+	[InlineData(-1)]
+	[InlineData(101)]
+	public void Search_default_take_out_of_range_fails(int take)
+	{
+		var validator = new HeimdallOptionsValidator();
+		var opts = Valid();
+		opts.Server.Search.DefaultTake = take;
+		var result = validator.Validate(null, opts);
+		result.Failed.Should().BeTrue();
+		result.FailureMessage.Should().Contain("defaultTake");
+	}
+
+	[Fact]
+	public void Forwarded_known_proxy_must_parse_as_ip()
+	{
+		var validator = new HeimdallOptionsValidator();
+		var opts = Valid();
+		opts.Server.ForwardedHeaders.KnownProxies.Add("not-an-ip");
+		var result = validator.Validate(null, opts);
+		result.Failed.Should().BeTrue();
+		result.FailureMessage.Should().Contain("knownProxies");
+	}
+
+	[Fact]
+	public void Forwarded_known_network_must_parse_as_cidr()
+	{
+		var validator = new HeimdallOptionsValidator();
+		var opts = Valid();
+		opts.Server.ForwardedHeaders.KnownNetworks.Add("10.0.0.0/notacidr");
+		var result = validator.Validate(null, opts);
+		result.Failed.Should().BeTrue();
+		result.FailureMessage.Should().Contain("knownNetworks");
+	}
+
+	[Fact]
+	public void Forwarded_headers_valid_entries_pass()
+	{
+		var validator = new HeimdallOptionsValidator();
+		var opts = Valid();
+		opts.Server.ForwardedHeaders.KnownProxies.Add("10.0.0.5");
+		opts.Server.ForwardedHeaders.KnownNetworks.Add("10.0.0.0/8");
+		var result = validator.Validate(null, opts);
+		result.Succeeded.Should().BeTrue();
+	}
 }

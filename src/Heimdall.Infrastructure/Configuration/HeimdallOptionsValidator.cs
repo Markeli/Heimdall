@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Options;
 
 namespace Heimdall.Infrastructure.Configuration;
@@ -24,6 +25,29 @@ public sealed class HeimdallOptionsValidator : IValidateOptions<HeimdallOptions>
 		else if (!IsHttpUrl(options.Server.PublicBaseUrl))
 		{
 			errors.Add($"heimdall.server.publicBaseUrl must be an absolute http(s) URL: '{options.Server.PublicBaseUrl}'");
+		}
+
+		for (var i = 0; i < options.Server.ForwardedHeaders.KnownProxies.Count; i++)
+		{
+			var raw = options.Server.ForwardedHeaders.KnownProxies[i];
+			if (!IPAddress.TryParse(raw, out _))
+			{
+				errors.Add($"heimdall.server.forwardedHeaders.knownProxies[{i}] is not a valid IP address: '{raw}'");
+			}
+		}
+
+		for (var i = 0; i < options.Server.ForwardedHeaders.KnownNetworks.Count; i++)
+		{
+			var raw = options.Server.ForwardedHeaders.KnownNetworks[i];
+			if (!IPNetwork.TryParse(raw, out _))
+			{
+				errors.Add($"heimdall.server.forwardedHeaders.knownNetworks[{i}] is not a valid CIDR network: '{raw}'");
+			}
+		}
+
+		if (options.Server.Search.DefaultTake is < 1 or > 100)
+		{
+			errors.Add($"heimdall.server.search.defaultTake must be in 1..100, got {options.Server.Search.DefaultTake}");
 		}
 
 		var seenFeedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

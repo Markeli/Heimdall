@@ -22,7 +22,7 @@ public sealed class HeimdallOptions
 	public ObservabilityOptions Observability { get; set; } = new();
 }
 
-/// <summary>Server-level settings: bind address and the externally-visible base URL.</summary>
+/// <summary>Server-level settings: bind address, public URL, proxy trust, and search defaults.</summary>
 public sealed class ServerOptions
 {
 	/// <summary>Kestrel listen URL (scheme + host + port).</summary>
@@ -30,6 +30,37 @@ public sealed class ServerOptions
 
 	/// <summary>External base URL used when rewriting <c>@id</c> values in NuGet registration responses.</summary>
 	public string PublicBaseUrl { get; set; } = "";
+
+	/// <summary>Reverse-proxy trust configuration. When both lists are empty the middleware is not registered.</summary>
+	public ForwardedHeadersOptions ForwardedHeaders { get; set; } = new();
+
+	/// <summary>Search endpoint defaults.</summary>
+	public SearchOptions Search { get; set; } = new();
+}
+
+/// <summary>
+/// Trust list for the ASP.NET Core forwarded-headers middleware. Bound as strings to allow YAML
+/// configuration; parsed into <see cref="System.Net.IPAddress"/> / <see cref="System.Net.IPNetwork"/>
+/// at startup. When both lists are empty the middleware is not registered and Kestrel's loopback-only
+/// default applies.
+/// </summary>
+public sealed class ForwardedHeadersOptions
+{
+	/// <summary>Individual reverse-proxy IP addresses Heimdall should trust X-Forwarded-* headers from.</summary>
+	public List<string> KnownProxies { get; set; } = [];
+
+	/// <summary>CIDR networks Heimdall should trust X-Forwarded-* headers from.</summary>
+	public List<string> KnownNetworks { get; set; } = [];
+}
+
+/// <summary>Tunable defaults for the NuGet v3 search endpoint.</summary>
+public sealed class SearchOptions
+{
+	/// <summary>
+	/// Default number of hits to return when the client omits or passes a non-positive <c>take</c>.
+	/// Constrained to <c>1..100</c> by <see cref="HeimdallOptionsValidator"/>.
+	/// </summary>
+	public int DefaultTake { get; set; } = 20;
 }
 
 /// <summary>Container for L1 and L2 cache strand settings.</summary>
