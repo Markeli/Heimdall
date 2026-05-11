@@ -1,23 +1,22 @@
 # Heimdall
 
-Внутренний прокси для публичных пакетных репозиториев (NuGet — MVP, npm/Maven позже) с правилами фильтрации (минимальный возраст версии, allow/deny по имени пакета). Файлы пакетов проксируются стримом, метаданные кэшируются в памяти.
+Internal proxy for public package repositories (NuGet — MVP; npm/Maven later) with filtering rules (minimum version age, allow/deny by package name). Package files are streamed through; metadata is cached in memory.
 
-## Стек
+## Stack
 
 - .NET 10, ASP.NET Core MVC controllers
-- HttpClient + Polly (`Microsoft.Extensions.Http.Resilience`) для upstream
-- Serilog → JSON в stdout
+- HttpClient + Polly (`Microsoft.Extensions.Http.Resilience`) for upstream calls
+- Serilog → JSON to stdout
 - prometheus-net → `/metrics`
-- xUnit + WireMock.Net для тестов
-- Конфиг — YAML с hot-reload
+- xUnit + WireMock.Net for tests
+- Configuration — YAML with hot-reload
 
-## Структура
+## Layout
 
 ```
 src/
-  Heimdall.Domain            # модели, контракты
-  Heimdall.Application       # use-cases, фильтры, правила
-  Heimdall.Infrastructure    # cache, YAML конфиг, generation
+  Heimdall.Core              # models, contracts, filters, rules
+  Heimdall.Infrastructure    # cache, YAML config, generation
   Heimdall.Ecosystems.NuGet  # NuGet V3 specifics
   Heimdall.Api               # ASP.NET Core host, controllers
 tests/
@@ -25,29 +24,41 @@ tests/
   Heimdall.IntegrationTests  # WebApplicationFactory + WireMock.Net
 ```
 
-## Запуск локально
+## Running locally
 
 ```sh
 dotnet run --project src/Heimdall.Api
 ```
 
-Сервер слушает `http://localhost:8080`. Конфигурация лежит рядом с `Heimdall.Api.dll` (`heimdall.yaml`). Hot-reload при изменении файла.
+The server listens on `http://localhost:8080`. Configuration sits next to `Heimdall.Api.dll` as `config.yml`, with optional `config.{Environment}.yml` and `config.secret.yml` (gitignored) overrides on top. All files are hot-reloaded on change.
 
-## Подключение клиента
+## Build (Cake)
+
+Build, test, and publish go through Cake so local and Docker builds produce identical artifacts.
+
+```sh
+dotnet tool restore
+dotnet cake --target=Test      # restore + build + test
+dotnet cake --target=Publish   # produces ./artifacts/publish/
+```
+
+The Docker image (`src/Heimdall.Api/Dockerfile`) calls the same `Publish` target inside the SDK image.
+
+## Wiring up a client
 
 ```sh
 dotnet nuget add source http://localhost:8080/nuget/strict/v3/index.json -n heimdall-strict
 dotnet add package Newtonsoft.Json
 ```
 
-Версии моложе `minAgeDays` будут отфильтрованы из `flatcontainer/{id}/index.json`. Попытка скачать запрещённую версию вернёт `403 ProblemDetails` с указанием правила.
+Versions younger than `minAgeDays` are filtered out of `flatcontainer/{id}/index.json`. Attempting to download a disallowed version returns `403 ProblemDetails` naming the rule that blocked it.
 
-## Конфигурация (YAML)
+## Configuration (YAML)
 
 ```yaml
 heimdall:
   server:
-    publicBaseUrl: "http://localhost:8080"   # обязательное — для rewrite @id URL
+    publicBaseUrl: "http://localhost:8080"   # required — used to rewrite @id URLs
   ecosystems:
     nuget:
       feeds:
@@ -61,51 +72,51 @@ heimdall:
               patterns: "Microsoft.*;System.*;!Internal.*"
 ```
 
-### Семантика `allowDeny`
-- Glob (`*`, `?`), case-insensitive. Префикс `!` — deny-pattern.
-- Любой матч deny → версия отклонена (deny wins).
-- Если есть хоть один allow-паттерн — пакет должен совпасть хотя бы с одним, иначе deny.
-- Только deny → разрешено всё, кроме denied.
+### `allowDeny` semantics
+- Glob (`*`, `?`), case-insensitive. The `!` prefix marks a deny-pattern.
+- Any deny match → version rejected (deny wins).
+- If at least one allow-pattern is present, the package must match at least one of them; otherwise it is denied.
+- Deny-only patterns → everything is allowed except the denied set.
 
-### Семантика `minAgeDays`
-- Версия разрешена, если `now - catalogEntry.published >= days`.
-- `published == null` → deny (страховка против повреждённых/unlisted метаданных).
+### `minAgeDays` semantics
+- A version is allowed when `now - catalogEntry.published >= days`.
+- `published == null` → denied (safeguard against corrupted/unlisted metadata).
 
-## Endpoint'ы
+## Endpoints
 
-| Path | Что делает |
+| Path | Purpose |
 |---|---|
-| `GET /nuget/{feed}/v3/index.json` | Service index (URL'ы указывают на Heimdall) |
-| `GET /nuget/{feed}/v3/flatcontainer/{id}/index.json` | Список разрешённых версий |
-| `GET /nuget/{feed}/v3/registration5-gz-semver2/{id}/index.json` | Registration с фильтром + URL rewrite |
-| `GET /nuget/{feed}/v3/query?q=...` | Search с фильтром |
-| `GET\|HEAD /nuget/{feed}/v3/flatcontainer/{id}/{ver}/{file}.nupkg` | Download через gate + stream |
-| `GET /healthz` | Liveness (200 ok) |
-| `GET /readyz` | Readiness (проверяет upstream reachability) |
-| `GET /metrics` | Prometheus метрики |
+| `GET /nuget/{feed}/v3/index.json` | Service index (URLs point back at Heimdall) |
+| `GET /nuget/{feed}/v3/flatcontainer/{id}/index.json` | List of allowed versions |
+| `GET /nuget/{feed}/v3/registration5-gz-semver2/{id}/index.json` | Registration with filtering + URL rewrite |
+| `GET /nuget/{feed}/v3/query?q=...` | Search with filtering |
+| `GET\|HEAD /nuget/{feed}/v3/flatcontainer/{id}/{ver}/{file}.nupkg` | Download via gate + stream |
+| `GET /healthz` | Liveness (200 OK) |
+| `GET /readyz` | Readiness (checks upstream reachability) |
+| `GET /metrics` | Prometheus metrics |
 
-## Тесты
+## Tests
 
 ```sh
 dotnet test
 ```
 
-- 42 unit-теста: правила, фильтры, кэш, конфиг, transformer, URL rewriter.
-- 9 integration-тестов: WebApplicationFactory + WireMock.Net (service-index, listing, download allow/deny, health, hot-reload).
+- 42 unit tests: rules, filters, cache, config, transformer, URL rewriter.
+- 9 integration tests: WebApplicationFactory + WireMock.Net (service index, listing, download allow/deny, health, hot-reload).
 
 ## Docker
 
 ```sh
 docker build -f src/Heimdall.Api/Dockerfile -t heimdall:dev .
-docker run --rm -p 8080:8080 -v $(pwd)/heimdall.yaml:/app/heimdall.yaml heimdall:dev
+docker run --rm -p 8080:8080 -v $(pwd)/config.yml:/app/config.yml heimdall:dev
 ```
 
 ## Out of scope (MVP)
 
-- L2 Redis (контракт готов, регистрируется через DI).
-- npm/Maven экосистемы.
-- CVE/vulnerability rules.
-- Auth (анонимный доступ внутри контура).
+- L2 Redis (contract is in place, registered through DI).
+- npm/Maven ecosystems.
+- CVE / vulnerability rules.
+- Auth (anonymous access inside the perimeter).
 - Multi-instance scaling.
 
-См. `/Users/markelow/.claude/plans/expressive-skipping-beacon.md` — финальный архитектурный план.
+See `/Users/markelow/.claude/plans/expressive-skipping-beacon.md` — the final architectural plan.
