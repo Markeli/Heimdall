@@ -12,7 +12,7 @@ namespace Heimdall.Ecosystems.NuGet.DependencyInjection;
 /// DI registration helpers for the NuGet ecosystem: URL resolver, upstream client, transformer,
 /// metadata service, and the two named HTTP clients (metadata and binary) with resilience policies.
 /// </summary>
-public static class NuGetEcosystemServiceCollectionExtensions
+public static class NuGetV3EcosystemServiceCollectionExtensions
 {
 	/// <summary>
 	/// Registers the NuGet ecosystem services and configures the metadata and binary HTTP clients with
@@ -21,23 +21,23 @@ public static class NuGetEcosystemServiceCollectionExtensions
 	/// <param name="services">Service collection to extend.</param>
 	/// <returns>The same <paramref name="services"/> instance for chaining.</returns>
 	/// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
-	public static IServiceCollection AddNuGetEcosystem(this IServiceCollection services)
+	public static IServiceCollection AddNuGetV3Ecosystem(this IServiceCollection services)
 	{
 		ArgumentNullException.ThrowIfNull(services);
 
-		services.TryAddSingleton<IUpstreamUrlResolver, UpstreamUrlResolver>();
-		services.TryAddSingleton<INuGetUpstreamClient, NuGetUpstreamClient>();
+		services.TryAddSingleton<INuGetV3UpstreamUrlResolver, NuGetV3UpstreamUrlResolver>();
+		services.TryAddSingleton<INuGetV3UpstreamClient, NuGetV3UpstreamClient>();
 		services.TryAddSingleton(TimeProvider.System);
 		services.TryAddSingleton(sp =>
 		{
 			var monitor = sp.GetRequiredService<IOptionsMonitor<HeimdallOptions>>();
-			return new NuGetUrlRewriter(new Uri(monitor.CurrentValue.Server.PublicBaseUrl));
+			return new NuGetV3UrlRewriter(new Uri(monitor.CurrentValue.Server.PublicBaseUrl));
 		});
-		services.TryAddSingleton<NuGetMetadataTransformer>();
-		services.TryAddSingleton<INuGetMetadataService, NuGetMetadataService>();
+		services.TryAddSingleton<NuGetV3MetadataTransformer>();
+		services.TryAddSingleton<INuGetV3MetadataService, NuGetV3MetadataService>();
 
 		// Metadata client: small JSON payloads, gzip/deflate negotiated, aggressive retries are safe.
-		services.AddHttpClient(NuGetUpstreamClient.MetadataHttpClientName)
+		services.AddHttpClient(NuGetV3UpstreamClient.MetadataHttpClientName)
 			.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
 			{
 				AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
@@ -59,7 +59,7 @@ public static class NuGetEcosystemServiceCollectionExtensions
 
 		// Binary client: streams .nupkg payloads which may be large; decompression is off because the
 		// content must be passed through to the caller byte-for-byte, and timeouts are much higher.
-		services.AddHttpClient(NuGetUpstreamClient.BinaryHttpClientName)
+		services.AddHttpClient(NuGetV3UpstreamClient.BinaryHttpClientName)
 			.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
 			{
 				AutomaticDecompression = DecompressionMethods.None,

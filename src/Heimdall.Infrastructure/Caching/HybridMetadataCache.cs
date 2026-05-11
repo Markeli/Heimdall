@@ -27,17 +27,17 @@ public sealed class HybridMetadataCache : IMetadataCache
 	/// <inheritdoc />
 	public async ValueTask<T?> GetAsync<T>(string key, CancellationToken ct) where T : class
 	{
-		var l1Hit = await _l1.GetAsync<T>(key, ct).ConfigureAwait(false);
+		var l1Hit = await _l1.GetAsync<T>(key, ct);
 		if (l1Hit is not null)
 		{
 			return l1Hit;
 		}
 
-		var l2Hit = await _l2.GetAsync<T>(key, ct).ConfigureAwait(false);
+		var l2Hit = await _l2.GetAsync<T>(key, ct);
 		if (l2Hit is not null)
 		{
 			// Promote with a short TTL: the authoritative TTL lives on L2, L1 is just a hot-path mirror.
-			await _l1.SetAsync(key, l2Hit, DefaultPromotionTtl, ct).ConfigureAwait(false);
+			await _l1.SetAsync(key, l2Hit, DefaultPromotionTtl, ct);
 		}
 
 		return l2Hit;
@@ -46,15 +46,15 @@ public sealed class HybridMetadataCache : IMetadataCache
 	/// <inheritdoc />
 	public async ValueTask SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct) where T : class
 	{
-		await _l1.SetAsync(key, value, ttl, ct).ConfigureAwait(false);
-		await _l2.SetAsync(key, value, ttl, ct).ConfigureAwait(false);
+		await _l1.SetAsync(key, value, ttl, ct);
+		await _l2.SetAsync(key, value, ttl, ct);
 	}
 
 	/// <inheritdoc />
 	public async ValueTask RemoveAsync(string key, CancellationToken ct)
 	{
-		await _l1.RemoveAsync(key, ct).ConfigureAwait(false);
-		await _l2.RemoveAsync(key, ct).ConfigureAwait(false);
+		await _l1.RemoveAsync(key, ct);
+		await _l2.RemoveAsync(key, ct);
 	}
 
 	private static readonly TimeSpan DefaultPromotionTtl = TimeSpan.FromMinutes(1);

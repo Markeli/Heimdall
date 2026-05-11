@@ -6,10 +6,10 @@ using Heimdall.Ecosystems.NuGet.V3.Models;
 namespace Heimdall.Ecosystems.NuGet.V3;
 
 /// <summary>
-/// Default <see cref="IUpstreamUrlResolver"/>: fetches and caches an upstream's service index by URL,
+/// Default <see cref="INuGetV3UpstreamUrlResolver"/>: fetches and caches an upstream's service index by URL,
 /// then locates known resource types within it.
 /// </summary>
-public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
+public sealed class NuGetV3UpstreamUrlResolver : INuGetV3UpstreamUrlResolver
 {
 	private static readonly JsonSerializerOptions JsonOptions = new()
 	{
@@ -24,14 +24,14 @@ public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 	private const string SearchQueryService = "SearchQueryService";
 
 	private readonly IHttpClientFactory _factory;
-	private readonly ConcurrentDictionary<string, ServiceIndex> _cache = new();
+	private readonly ConcurrentDictionary<string, ServiceIndexV3> _cache = new();
 
 	/// <summary>
-	/// Creates a new <see cref="UpstreamUrlResolver"/>.
+	/// Creates a new <see cref="NuGetV3UpstreamUrlResolver"/>.
 	/// </summary>
 	/// <param name="factory">Factory used to resolve the metadata HTTP client.</param>
 	/// <exception cref="ArgumentNullException">Thrown when <paramref name="factory"/> is null.</exception>
-	public UpstreamUrlResolver(IHttpClientFactory factory)
+	public NuGetV3UpstreamUrlResolver(IHttpClientFactory factory)
 	{
 		ArgumentNullException.ThrowIfNull(factory);
 		_factory = factory;
@@ -40,7 +40,7 @@ public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 	/// <inheritdoc />
 	public async Task<Uri> GetRegistrationBaseUrlAsync(Uri serviceIndex, CancellationToken ct)
 	{
-		var index = await GetServiceIndexAsync(serviceIndex, ct).ConfigureAwait(false);
+		var index = await GetServiceIndexV3Async(serviceIndex, ct);
 		var url = FindResource(index, RegistrationsBaseUrlSemver2)
 			?? FindResource(index, RegistrationsBaseUrlGzSemver2)
 			?? throw new InvalidOperationException(
@@ -51,7 +51,7 @@ public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 	/// <inheritdoc />
 	public async Task<Uri> GetPackageBaseAddressAsync(Uri serviceIndex, CancellationToken ct)
 	{
-		var index = await GetServiceIndexAsync(serviceIndex, ct).ConfigureAwait(false);
+		var index = await GetServiceIndexV3Async(serviceIndex, ct);
 		var url = FindResource(index, PackageBaseAddress)
 			?? throw new InvalidOperationException(
 				$"upstream service index '{serviceIndex}' has no PackageBaseAddress/3.0.0");
@@ -61,13 +61,13 @@ public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 	/// <inheritdoc />
 	public async Task<string> GetSearchQueryServiceAsync(Uri serviceIndex, CancellationToken ct)
 	{
-		var index = await GetServiceIndexAsync(serviceIndex, ct).ConfigureAwait(false);
+		var index = await GetServiceIndexV3Async(serviceIndex, ct);
 		return FindResource(index, SearchQueryService)
 			?? throw new InvalidOperationException(
 				$"upstream service index '{serviceIndex}' has no SearchQueryService");
 	}
 
-	private async Task<ServiceIndex> GetServiceIndexAsync(Uri uri, CancellationToken ct)
+	private async Task<ServiceIndexV3> GetServiceIndexV3Async(Uri uri, CancellationToken ct)
 	{
 		var key = uri.ToString();
 		if (_cache.TryGetValue(key, out var existing))
@@ -75,16 +75,16 @@ public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 			return existing;
 		}
 
-		var http = _factory.CreateClient(NuGetUpstreamClient.MetadataHttpClientName);
-		var index = await http.GetFromJsonAsync<ServiceIndex>(uri, JsonOptions, ct)
-			.ConfigureAwait(false)
+		var http = _factory.CreateClient(NuGetV3UpstreamClient.MetadataHttpClientName);
+		var index = await http.GetFromJsonAsync<ServiceIndexV3>(uri, JsonOptions, ct)
+			
 			?? throw new InvalidOperationException($"upstream service index '{uri}' returned null");
 
 		_cache[key] = index;
 		return index;
 	}
 
-	private static string? FindResource(ServiceIndex index, string type)
+	private static string? FindResource(ServiceIndexV3 index, string type)
 	{
 		foreach (var r in index.Resources)
 		{

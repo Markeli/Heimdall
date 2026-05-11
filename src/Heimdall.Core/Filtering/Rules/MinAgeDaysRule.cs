@@ -36,12 +36,12 @@ public sealed class MinAgeDaysRule : IRule
 		ArgumentNullException.ThrowIfNull(meta);
 
 		// Safeguard: missing publication date is treated as deny — we cannot prove the age requirement.
-		if (!meta.Published.HasValue)
+		if (!meta.PublishedUtc.HasValue)
 		{
 			return RuleVerdict.Deny(RuleName, "published date is missing");
 		}
 
-		var age = ctx.NowUtc - meta.Published.Value;
+		var age = ctx.NowUtc - meta.PublishedUtc.Value;
 		if (age >= TimeSpan.FromDays(_days))
 		{
 			return RuleVerdict.Allow;

@@ -7,7 +7,7 @@ using WireMock.Server;
 
 namespace Heimdall.IntegrationTests.NuGet;
 
-public class NuGetUpstreamClientTests : IDisposable
+public class NuGetV3UpstreamClientTests : IDisposable
 {
 	private readonly WireMockServer _server = WireMockServer.Start();
 
@@ -69,7 +69,7 @@ public class NuGetUpstreamClientTests : IDisposable
 				"""));
 
 		await using var sp = BuildServices();
-		var client = sp.GetRequiredService<INuGetUpstreamClient>();
+		var client = sp.GetRequiredService<INuGetV3UpstreamClient>();
 
 		var index = await client.GetRegistrationAsync(new Uri(serviceIndexUrl), "Newtonsoft.Json", default);
 
@@ -77,9 +77,9 @@ public class NuGetUpstreamClientTests : IDisposable
 		index!.Items.Should().HaveCount(1);
 		var leaves = index.Items[0].Items!;
 		leaves.Should().HaveCount(2);
-		leaves[0].CatalogEntry!.PackageId.Should().Be("Newtonsoft.Json");
-		leaves[0].CatalogEntry!.Version.Should().Be("12.0.3");
-		leaves[0].CatalogEntry!.Published.Should().NotBeNull();
+		leaves[0].CatalogEntryV3!.PackageId.Should().Be("Newtonsoft.Json");
+		leaves[0].CatalogEntryV3!.Version.Should().Be("12.0.3");
+		leaves[0].CatalogEntryV3!.PublishedUtc.Should().NotBeNull();
 	}
 
 	[Fact]
@@ -101,7 +101,7 @@ public class NuGetUpstreamClientTests : IDisposable
 			.RespondWith(Response.Create().WithStatusCode(404));
 
 		await using var sp = BuildServices();
-		var client = sp.GetRequiredService<INuGetUpstreamClient>();
+		var client = sp.GetRequiredService<INuGetV3UpstreamClient>();
 
 		var result = await client.GetRegistrationAsync(new Uri(serviceIndexUrl), "Missing", default);
 
@@ -112,7 +112,7 @@ public class NuGetUpstreamClientTests : IDisposable
 	{
 		var services = new ServiceCollection();
 		services.AddLogging();
-		services.AddNuGetEcosystem();
+		services.AddNuGetV3Ecosystem();
 		return services.BuildServiceProvider();
 	}
 }

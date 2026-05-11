@@ -5,7 +5,7 @@ namespace Heimdall.Ecosystems.NuGet.V3.Models;
 /// <summary>
 /// NuGet V3 service index (wire format). Lists the resource endpoints exposed by a V3 feed at <c>index.json</c>.
 /// </summary>
-public sealed class ServiceIndex
+public sealed class ServiceIndexV3
 {
 	/// <summary>Protocol schema version reported by the service index. Defaults to <c>3.0.0</c>.</summary>
 	[JsonPropertyName("version")]
@@ -13,13 +13,13 @@ public sealed class ServiceIndex
 
 	/// <summary>Resources advertised by the feed, each identifying a typed endpoint.</summary>
 	[JsonPropertyName("resources")]
-	public List<ServiceResource> Resources { get; set; } = [];
+	public List<ServiceResourceV3> Resources { get; set; } = [];
 }
 
 /// <summary>
 /// NuGet V3 service-index resource entry (wire format). Pairs an absolute URL with a typed role.
 /// </summary>
-public sealed class ServiceResource
+public sealed class ServiceResourceV3
 {
 	/// <summary>Absolute URL of the resource (the <c>@id</c> in the wire payload).</summary>
 	[JsonPropertyName("@id")]

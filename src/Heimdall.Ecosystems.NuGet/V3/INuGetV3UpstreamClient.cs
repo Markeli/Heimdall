@@ -7,7 +7,7 @@ namespace Heimdall.Ecosystems.NuGet.V3;
 /// and binary content). Implementations are expected to use named <see cref="HttpClient"/> instances with
 /// resilience policies attached via DI.
 /// </summary>
-public interface INuGetUpstreamClient
+public interface INuGetV3UpstreamClient
 {
 	/// <summary>
 	/// Fetches the registration index for a package from the upstream feed.
@@ -17,7 +17,7 @@ public interface INuGetUpstreamClient
 	/// <param name="ct">Cancellation token.</param>
 	/// <returns>The deserialized registration index, or null when the upstream returned 404.</returns>
 	/// <exception cref="HttpRequestException">Propagated when the upstream returns a non-success, non-404 status.</exception>
-	Task<RegistrationIndex?> GetRegistrationAsync(
+	Task<RegistrationIndexV3?> GetRegistrationAsync(
 		Uri serviceIndex, string packageId, CancellationToken ct);
 
 	/// <summary>
@@ -31,7 +31,7 @@ public interface INuGetUpstreamClient
 	/// <param name="ct">Cancellation token.</param>
 	/// <returns>The deserialized search result, or null when the upstream returned 404.</returns>
 	/// <exception cref="HttpRequestException">Propagated when the upstream returns a non-success, non-404 status.</exception>
-	Task<SearchResult?> SearchAsync(
+	Task<SearchResultV3?> SearchAsync(
 		Uri serviceIndex, string query, int skip, int take, bool includePrerelease, CancellationToken ct);
 
 	/// <summary>

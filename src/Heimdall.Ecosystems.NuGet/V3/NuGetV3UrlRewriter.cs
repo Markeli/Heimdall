@@ -5,17 +5,17 @@ namespace Heimdall.Ecosystems.NuGet.V3;
 /// All paths are anchored at <c>{publicBaseUrl}/nuget/{feed}/v3/...</c> and use lowercased
 /// package identifiers and versions as required by the NuGet V3 protocol.
 /// </summary>
-public sealed class NuGetUrlRewriter
+public sealed class NuGetV3UrlRewriter
 {
 	private readonly Uri _publicBase;
 
 	/// <summary>
-	/// Creates a new <see cref="NuGetUrlRewriter"/>.
+	/// Creates a new <see cref="NuGetV3UrlRewriter"/>.
 	/// </summary>
 	/// <param name="publicBaseUrl">Absolute base URL of the Heimdall server reachable by clients.</param>
 	/// <exception cref="ArgumentNullException">Thrown when <paramref name="publicBaseUrl"/> is null.</exception>
 	/// <exception cref="ArgumentException">Thrown when <paramref name="publicBaseUrl"/> is not absolute.</exception>
-	public NuGetUrlRewriter(Uri publicBaseUrl)
+	public NuGetV3UrlRewriter(Uri publicBaseUrl)
 	{
 		ArgumentNullException.ThrowIfNull(publicBaseUrl);
 		if (!publicBaseUrl.IsAbsoluteUri)
@@ -28,7 +28,7 @@ public sealed class NuGetUrlRewriter
 
 	/// <summary>Returns the Heimdall URL of the feed's V3 service index (<c>index.json</c>).</summary>
 	/// <param name="feed">Configured feed name.</param>
-	public Uri ServiceIndex(string feed) =>
+	public Uri ServiceIndexV3(string feed) =>
 		Combine($"nuget/{feed}/v3/index.json");
 
 	// We advertise the registration5-gz-semver2 path on Heimdall so clients negotiate the modern
@@ -46,14 +46,14 @@ public sealed class NuGetUrlRewriter
 	/// <summary>Returns the Heimdall URL of a package's registration index.</summary>
 	/// <param name="feed">Configured feed name.</param>
 	/// <param name="packageId">Package identifier (will be lowercased).</param>
-	public Uri RegistrationIndex(string feed, string packageId) =>
+	public Uri RegistrationIndexV3(string feed, string packageId) =>
 		Combine($"nuget/{feed}/v3/registration5-gz-semver2/{packageId.ToLowerInvariant()}/index.json");
 
 	/// <summary>Returns the Heimdall URL of a single registration leaf for a specific version.</summary>
 	/// <param name="feed">Configured feed name.</param>
 	/// <param name="packageId">Package identifier (will be lowercased).</param>
 	/// <param name="version">Version string (will be lowercased).</param>
-	public Uri RegistrationLeaf(string feed, string packageId, string version) =>
+	public Uri RegistrationLeafV3(string feed, string packageId, string version) =>
 		Combine(
 			$"nuget/{feed}/v3/registration5-gz-semver2/{packageId.ToLowerInvariant()}"
 			+ $"/{version.ToLowerInvariant()}.json");
@@ -63,7 +63,7 @@ public sealed class NuGetUrlRewriter
 	/// <param name="packageId">Package identifier (will be lowercased).</param>
 	/// <param name="lower">Lower bound version (will be lowercased).</param>
 	/// <param name="upper">Upper bound version (will be lowercased).</param>
-	public Uri RegistrationPage(string feed, string packageId, string lower, string upper) =>
+	public Uri RegistrationPageV3(string feed, string packageId, string lower, string upper) =>
 		Combine(
 			$"nuget/{feed}/v3/registration5-gz-semver2/{packageId.ToLowerInvariant()}"
 			+ $"/page/{lower.ToLowerInvariant()}/{upper.ToLowerInvariant()}.json");

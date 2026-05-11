@@ -7,7 +7,7 @@ namespace Heimdall.Ecosystems.NuGet.V3;
 /// Orchestrates NuGet V3 metadata responses for Heimdall controllers: fetches upstream data,
 /// applies configured filters, rewrites URLs back through Heimdall, and memoizes results per feed.
 /// </summary>
-public interface INuGetMetadataService
+public interface INuGetV3MetadataService
 {
 	/// <summary>
 	/// Resolves the configured feed by name within the NuGet ecosystem.
@@ -22,7 +22,7 @@ public interface INuGetMetadataService
 	/// </summary>
 	/// <param name="feedName">Configured feed name.</param>
 	/// <returns>Serialized JSON of the Heimdall service index.</returns>
-	string BuildServiceIndexJson(string feedName);
+	string BuildServiceIndexV3Json(string feedName);
 
 	/// <summary>
 	/// Returns the filtered flat-container <c>index.json</c> (versions list) for the package.
@@ -63,6 +63,6 @@ public interface INuGetMetadataService
 	/// <param name="version">Exact version string to match (case-insensitive).</param>
 	/// <param name="ct">Cancellation token.</param>
 	/// <returns>The matching leaf, or null when the package or version is not found.</returns>
-	Task<RegistrationLeaf?> GetVersionLeafAsync(
+	Task<RegistrationLeafV3?> GetVersionLeafAsync(
 		string feedName, string packageId, string version, CancellationToken ct);
 }

@@ -5,20 +5,20 @@ namespace Heimdall.Api.Controllers;
 
 /// <summary>
 /// NuGet v3 read-only metadata endpoints (service index, flat-container versions list, registration,
-/// and search). Each action delegates to <see cref="INuGetMetadataService"/>.
+/// and search). Each action delegates to <see cref="INuGetV3MetadataService"/>.
 /// </summary>
 [ApiController]
 [Route("/nuget/{feed}/v3")]
-public sealed class NuGetMetadataController : ControllerBase
+public sealed class NuGetV3MetadataController : ControllerBase
 {
-	private readonly INuGetMetadataService _service;
+	private readonly INuGetV3MetadataService _service;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="NuGetMetadataController"/> class.
+	/// Initializes a new instance of the <see cref="NuGetV3MetadataController"/> class.
 	/// </summary>
 	/// <param name="service">Service that builds and fetches NuGet v3 metadata documents.</param>
 	/// <exception cref="ArgumentNullException">Thrown when <paramref name="service"/> is null.</exception>
-	public NuGetMetadataController(INuGetMetadataService service)
+	public NuGetV3MetadataController(INuGetV3MetadataService service)
 	{
 		ArgumentNullException.ThrowIfNull(service);
 		_service = service;
@@ -32,13 +32,13 @@ public sealed class NuGetMetadataController : ControllerBase
 	/// <response code="200">Service index returned.</response>
 	/// <response code="404">The feed is not configured.</response>
 	[HttpGet("index.json")]
-	public IActionResult GetServiceIndex(string feed)
+	public IActionResult GetServiceIndexV3(string feed)
 	{
 		if (!_service.TryGetFeed(feed, out _))
 		{
 			return Problem(statusCode: 404, title: "Unknown feed", detail: $"feed '{feed}' is not configured");
 		}
-		return Content(_service.BuildServiceIndexJson(feed), "application/json");
+		return Content(_service.BuildServiceIndexV3Json(feed), "application/json");
 	}
 
 	/// <summary>
@@ -104,7 +104,7 @@ public sealed class NuGetMetadataController : ControllerBase
 	/// <response code="200">Registration page returned.</response>
 	/// <response code="404">The feed or the package is unknown.</response>
 	[HttpGet("registration5-gz-semver2/{packageId}/page/{lower}/{upper}.json")]
-	public Task<IActionResult> GetRegistrationPage(
+	public Task<IActionResult> GetRegistrationPageV3(
 		string feed, string packageId, string lower, string upper, CancellationToken ct) =>
 		GetRegistration(feed, packageId, ct);
 

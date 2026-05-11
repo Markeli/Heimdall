@@ -5,7 +5,7 @@ namespace Heimdall.Ecosystems.NuGet.V3.Models;
 /// <summary>
 /// NuGet V3 search response (wire format) returned by the <c>SearchQueryService</c> endpoint.
 /// </summary>
-public sealed class SearchResult
+public sealed class SearchResultV3
 {
 	/// <summary>Total number of hits matching the query on the upstream, before paging.</summary>
 	[JsonPropertyName("totalHits")]
@@ -13,13 +13,13 @@ public sealed class SearchResult
 
 	/// <summary>The page of matching package hits returned by the upstream.</summary>
 	[JsonPropertyName("data")]
-	public List<SearchHit> Data { get; set; } = [];
+	public List<SearchHitV3> Data { get; set; } = [];
 }
 
 /// <summary>
 /// NuGet V3 search hit (wire format). Represents a single package and its known versions.
 /// </summary>
-public sealed class SearchHit
+public sealed class SearchHitV3
 {
 	/// <summary>Absolute URL identifying this hit's registration index (the <c>@id</c> field).</summary>
 	[JsonPropertyName("@id")]
@@ -43,13 +43,13 @@ public sealed class SearchHit
 
 	/// <summary>All versions of the package included in the hit.</summary>
 	[JsonPropertyName("versions")]
-	public List<SearchVersion> Versions { get; set; } = [];
+	public List<SearchVersionV3> Versions { get; set; } = [];
 }
 
 /// <summary>
 /// NuGet V3 search hit version entry (wire format).
 /// </summary>
-public sealed class SearchVersion
+public sealed class SearchVersionV3
 {
 	/// <summary>Package version string.</summary>
 	[JsonPropertyName("version")]

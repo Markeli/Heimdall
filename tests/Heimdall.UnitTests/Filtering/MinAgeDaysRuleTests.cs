@@ -11,7 +11,7 @@ public class MinAgeDaysRuleTests
 	private static readonly DateTimeOffset Now = new(2026, 5, 6, 12, 0, 0, TimeSpan.Zero);
 	private static readonly RuleContext Ctx = new("nuget", "strict", Now);
 
-	private static PackageVersionMetadata MetaWithPublished(DateTimeOffset? published) =>
+	private static PackageVersionMetadata MetaWithPublishedUtc(DateTimeOffset? published) =>
 		new(
 			new PackageCoordinates("nuget", "Foo", SemVersion.Parse("1.0.0")),
 			published,
@@ -22,7 +22,7 @@ public class MinAgeDaysRuleTests
 	{
 		var rule = new MinAgeDaysRule(days: 14);
 
-		var verdict = rule.Evaluate(MetaWithPublished(Now.AddDays(-14)), Ctx);
+		var verdict = rule.Evaluate(MetaWithPublishedUtc(Now.AddDays(-14)), Ctx);
 
 		verdict.IsAllow.Should().BeTrue();
 	}
@@ -32,7 +32,7 @@ public class MinAgeDaysRuleTests
 	{
 		var rule = new MinAgeDaysRule(days: 14);
 
-		var verdict = rule.Evaluate(MetaWithPublished(Now.AddYears(-1)), Ctx);
+		var verdict = rule.Evaluate(MetaWithPublishedUtc(Now.AddYears(-1)), Ctx);
 
 		verdict.IsAllow.Should().BeTrue();
 	}
@@ -42,7 +42,7 @@ public class MinAgeDaysRuleTests
 	{
 		var rule = new MinAgeDaysRule(days: 14);
 
-		var verdict = rule.Evaluate(MetaWithPublished(Now.AddDays(-14).AddSeconds(1)), Ctx);
+		var verdict = rule.Evaluate(MetaWithPublishedUtc(Now.AddDays(-14).AddSeconds(1)), Ctx);
 
 		verdict.IsDeny.Should().BeTrue();
 		verdict.Reason!.RuleName.Should().Be("minAgeDays");
@@ -53,7 +53,7 @@ public class MinAgeDaysRuleTests
 	{
 		var rule = new MinAgeDaysRule(days: 14);
 
-		var verdict = rule.Evaluate(MetaWithPublished(Now.AddDays(1)), Ctx);
+		var verdict = rule.Evaluate(MetaWithPublishedUtc(Now.AddDays(1)), Ctx);
 
 		verdict.IsDeny.Should().BeTrue();
 	}
@@ -63,7 +63,7 @@ public class MinAgeDaysRuleTests
 	{
 		var rule = new MinAgeDaysRule(days: 14);
 
-		var verdict = rule.Evaluate(MetaWithPublished(null), Ctx);
+		var verdict = rule.Evaluate(MetaWithPublishedUtc(null), Ctx);
 
 		verdict.IsDeny.Should().BeTrue();
 		verdict.Reason!.Message.Should().Contain("published date is missing");

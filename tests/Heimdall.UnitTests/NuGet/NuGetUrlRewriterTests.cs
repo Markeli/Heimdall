@@ -2,21 +2,21 @@ using Heimdall.Ecosystems.NuGet.V3;
 
 namespace Heimdall.UnitTests.NuGet;
 
-public class NuGetUrlRewriterTests
+public class NuGetV3UrlRewriterTests
 {
-	private readonly NuGetUrlRewriter _urls = new(new Uri("https://heimdall.local/"));
+	private readonly NuGetV3UrlRewriter _urls = new(new Uri("https://heimdall.local/"));
 
 	[Fact]
-	public void ServiceIndex_url()
+	public void ServiceIndexV3_url()
 	{
-		_urls.ServiceIndex("strict").ToString()
+		_urls.ServiceIndexV3("strict").ToString()
 			.Should().Be("https://heimdall.local/nuget/strict/v3/index.json");
 	}
 
 	[Fact]
-	public void RegistrationIndex_url_lowercases_id()
+	public void RegistrationIndexV3_url_lowercases_id()
 	{
-		_urls.RegistrationIndex("strict", "Newtonsoft.Json").ToString()
+		_urls.RegistrationIndexV3("strict", "Newtonsoft.Json").ToString()
 			.Should().Be("https://heimdall.local/nuget/strict/v3/registration5-gz-semver2/newtonsoft.json/index.json");
 	}
 
@@ -31,8 +31,8 @@ public class NuGetUrlRewriterTests
 	[Fact]
 	public void Public_base_without_trailing_slash_works()
 	{
-		var u = new NuGetUrlRewriter(new Uri("https://heimdall.local"));
-		u.ServiceIndex("strict").ToString()
+		var u = new NuGetV3UrlRewriter(new Uri("https://heimdall.local"));
+		u.ServiceIndexV3("strict").ToString()
 			.Should().Be("https://heimdall.local/nuget/strict/v3/index.json");
 	}
 }

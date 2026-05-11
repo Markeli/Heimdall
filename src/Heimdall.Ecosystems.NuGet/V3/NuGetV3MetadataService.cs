@@ -6,22 +6,22 @@ using Heimdall.Ecosystems.NuGet.V3.Models;
 namespace Heimdall.Ecosystems.NuGet.V3;
 
 /// <summary>
-/// Default <see cref="INuGetMetadataService"/>: orchestrates upstream fetches, runs configured filters,
+/// Default <see cref="INuGetV3MetadataService"/>: orchestrates upstream fetches, runs configured filters,
 /// rewrites URLs through Heimdall, and memoizes registration documents in <see cref="IMetadataCache"/>.
 /// </summary>
-public sealed class NuGetMetadataService : INuGetMetadataService
+public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 {
 	private const string Ecosystem = "nuget";
 
 	private readonly IFeedConfigLookup _lookup;
 	private readonly IConfigSnapshotProvider _snapshots;
-	private readonly INuGetUpstreamClient _upstream;
+	private readonly INuGetV3UpstreamClient _upstream;
 	private readonly IMetadataCache _cache;
-	private readonly NuGetMetadataTransformer _transformer;
-	private readonly NuGetUrlRewriter _urls;
+	private readonly NuGetV3MetadataTransformer _transformer;
+	private readonly NuGetV3UrlRewriter _urls;
 
 	/// <summary>
-	/// Creates a new <see cref="NuGetMetadataService"/>.
+	/// Creates a new <see cref="NuGetV3MetadataService"/>.
 	/// </summary>
 	/// <param name="lookup">Lookup for feed configuration by ecosystem and feed name.</param>
 	/// <param name="snapshots">Provider of monotonic configuration snapshots used to key the cache.</param>
@@ -30,13 +30,13 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 	/// <param name="transformer">Filter-and-rewrite transformer.</param>
 	/// <param name="urls">Heimdall-facing URL rewriter.</param>
 	/// <exception cref="ArgumentNullException">Thrown when any dependency is null.</exception>
-	public NuGetMetadataService(
+	public NuGetV3MetadataService(
 		IFeedConfigLookup lookup,
 		IConfigSnapshotProvider snapshots,
-		INuGetUpstreamClient upstream,
+		INuGetV3UpstreamClient upstream,
 		IMetadataCache cache,
-		NuGetMetadataTransformer transformer,
-		NuGetUrlRewriter urls)
+		NuGetV3MetadataTransformer transformer,
+		NuGetV3UrlRewriter urls)
 	{
 		ArgumentNullException.ThrowIfNull(lookup);
 		ArgumentNullException.ThrowIfNull(snapshots);
@@ -58,28 +58,28 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 		_lookup.TryGet(Ecosystem, feedName, out feed);
 
 	/// <inheritdoc />
-	public string BuildServiceIndexJson(string feedName)
+	public string BuildServiceIndexV3Json(string feedName)
 	{
 		// Clients must talk to Heimdall, never to the upstream directly, so every resource URL
-		// advertised here is a Heimdall URL produced by NuGetUrlRewriter.
-		var index = new ServiceIndex
+		// advertised here is a Heimdall URL produced by NuGetV3UrlRewriter.
+		var index = new ServiceIndexV3
 		{
 			Version = "3.0.0",
 			Resources =
 			[
-				new ServiceResource
+				new ServiceResourceV3
 				{
 					Id = _urls.RegistrationsBase(feedName).ToString(),
 					Type = "RegistrationsBaseUrl/3.6.0",
 					Comment = "Heimdall registration base",
 				},
-				new ServiceResource
+				new ServiceResourceV3
 				{
 					Id = _urls.FlatContainerBase(feedName).ToString(),
 					Type = "PackageBaseAddress/3.0.0",
 					Comment = "Heimdall flat container",
 				},
-				new ServiceResource
+				new ServiceResourceV3
 				{
 					Id = _urls.SearchQuery(feedName).ToString(),
 					Type = "SearchQueryService",
@@ -94,7 +94,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 	/// <inheritdoc />
 	public async Task<string?> GetVersionsListJsonAsync(string feedName, string packageId, CancellationToken ct)
 	{
-		var registration = await GetRegistrationFromCacheOrUpstreamAsync(feedName, packageId, ct).ConfigureAwait(false);
+		var registration = await GetRegistrationFromCacheOrUpstreamAsync(feedName, packageId, ct);
 		if (registration is null)
 		{
 			return null;
@@ -107,7 +107,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 	/// <inheritdoc />
 	public async Task<string?> GetRegistrationJsonAsync(string feedName, string packageId, CancellationToken ct)
 	{
-		var registration = await GetRegistrationFromCacheOrUpstreamAsync(feedName, packageId, ct).ConfigureAwait(false);
+		var registration = await GetRegistrationFromCacheOrUpstreamAsync(feedName, packageId, ct);
 		if (registration is null)
 		{
 			return null;
@@ -123,7 +123,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 	{
 		var feed = RequireFeed(feedName);
 		var result = await _upstream.SearchAsync(
-			feed.Upstream, query ?? "", skip, take, includePrerelease, ct).ConfigureAwait(false);
+			feed.Upstream, query ?? "", skip, take, includePrerelease, ct);
 		if (result is null)
 		{
 			return null;
@@ -133,10 +133,10 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 	}
 
 	/// <inheritdoc />
-	public async Task<RegistrationLeaf?> GetVersionLeafAsync(
+	public async Task<RegistrationLeafV3?> GetVersionLeafAsync(
 		string feedName, string packageId, string version, CancellationToken ct)
 	{
-		var registration = await GetRegistrationFromCacheOrUpstreamAsync(feedName, packageId, ct).ConfigureAwait(false);
+		var registration = await GetRegistrationFromCacheOrUpstreamAsync(feedName, packageId, ct);
 		if (registration is null)
 		{
 			return null;
@@ -150,7 +150,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 			}
 			foreach (var leaf in page.Items)
 			{
-				if (string.Equals(leaf.CatalogEntry?.Version, version, StringComparison.OrdinalIgnoreCase))
+				if (string.Equals(leaf.CatalogEntryV3?.Version, version, StringComparison.OrdinalIgnoreCase))
 				{
 					return leaf;
 				}
@@ -160,7 +160,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 		return null;
 	}
 
-	private async Task<RegistrationIndex?> GetRegistrationFromCacheOrUpstreamAsync(
+	private async Task<RegistrationIndexV3?> GetRegistrationFromCacheOrUpstreamAsync(
 		string feedName, string packageId, CancellationToken ct)
 	{
 		var feed = RequireFeed(feedName);
@@ -169,20 +169,20 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 		// Including the snapshot generation in the cache key invalidates entries automatically
 		// whenever feed configuration changes. Package IDs are lowercased to match NuGet's normalization.
 		var key = $"g{snapshot.Generation}:{Ecosystem}:{feedName}:reg:{packageId.ToLowerInvariant()}";
-		var cached = await _cache.GetAsync<RegistrationIndex>(key, ct).ConfigureAwait(false);
+		var cached = await _cache.GetAsync<RegistrationIndexV3>(key, ct);
 		if (cached is not null)
 		{
 			return cached;
 		}
 
-		var fetched = await _upstream.GetRegistrationAsync(feed.Upstream, packageId, ct).ConfigureAwait(false);
+		var fetched = await _upstream.GetRegistrationAsync(feed.Upstream, packageId, ct);
 		if (fetched is null)
 		{
 			return null;
 		}
 
 		var ttl = feed.CacheTtl ?? TimeSpan.FromMinutes(5);
-		await _cache.SetAsync(key, fetched, ttl, ct).ConfigureAwait(false);
+		await _cache.SetAsync(key, fetched, ttl, ct);
 		return fetched;
 	}
 
@@ -202,7 +202,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 }
 
 /// <summary>
-/// Thrown by <see cref="NuGetMetadataService"/> when a feed name is not registered in the configured ecosystem.
+/// Thrown by <see cref="NuGetV3MetadataService"/> when a feed name is not registered in the configured ecosystem.
 /// </summary>
 public sealed class FeedNotFoundException : Exception
 {

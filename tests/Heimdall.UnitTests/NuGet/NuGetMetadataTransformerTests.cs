@@ -8,15 +8,15 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.UnitTests.NuGet;
 
-public class NuGetMetadataTransformerTests
+public class NuGetV3MetadataTransformerTests
 {
 	private static readonly DateTimeOffset Now = new(2026, 5, 6, 12, 0, 0, TimeSpan.Zero);
 
-	private static (NuGetMetadataTransformer, FeedConfig) Build(int minAgeDays)
+	private static (NuGetV3MetadataTransformer, FeedConfig) Build(int minAgeDays)
 	{
 		var sp = new ServiceCollection().AddHeimdallCore().BuildServiceProvider();
-		var transformer = new NuGetMetadataTransformer(
-			new NuGetUrlRewriter(new Uri("https://heimdall.local/")),
+		var transformer = new NuGetV3MetadataTransformer(
+			new NuGetV3UrlRewriter(new Uri("https://heimdall.local/")),
 			sp.GetRequiredService<IVersionListFilter>(),
 			new FixedTimeProvider(Now));
 
@@ -31,13 +31,13 @@ public class NuGetMetadataTransformerTests
 		return (transformer, feed);
 	}
 
-	private static RegistrationIndex SampleRegistration() => new()
+	private static RegistrationIndexV3 SampleRegistration() => new()
 	{
 		Id = "https://upstream/registration/newtonsoft.json/index.json",
 		Count = 1,
 		Items =
 		[
-			new RegistrationPage
+			new RegistrationPageV3
 			{
 				Count = 3,
 				Items =
@@ -50,14 +50,14 @@ public class NuGetMetadataTransformerTests
 		],
 	};
 
-	private static RegistrationLeaf Leaf(string id, string version, DateTimeOffset published) => new()
+	private static RegistrationLeafV3 Leaf(string id, string version, DateTimeOffset published) => new()
 	{
 		Id = $"https://upstream/registration/{id.ToLowerInvariant()}/{version}.json",
-		CatalogEntry = new CatalogEntry
+		CatalogEntryV3 = new CatalogEntryV3
 		{
 			PackageId = id,
 			Version = version,
-			Published = published,
+			PublishedUtc = published,
 			Listed = true,
 			PackageContent = $"https://upstream/p/{id.ToLowerInvariant()}/{version}/{id.ToLowerInvariant()}.{version}.nupkg",
 		},

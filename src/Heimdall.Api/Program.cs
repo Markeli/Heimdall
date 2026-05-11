@@ -31,9 +31,9 @@ builder.Services.AddHealthChecks()
 
 builder.Services.AddHeimdallCore();
 builder.Services.AddHeimdallInfrastructure(builder.Configuration);
-builder.Services.AddNuGetEcosystem();
+builder.Services.AddNuGetV3Ecosystem();
 builder.Services.AddSingleton<AuditLogger>();
-builder.Services.AddSingleton<BinaryProxyService>();
+builder.Services.AddSingleton<NuGetV3BinaryProxyService>();
 
 var app = builder.Build();
 

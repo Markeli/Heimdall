@@ -1,4 +1,5 @@
 using Heimdall.Api.Audit;
+using Heimdall.Api.Http;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Filtering;
 using Heimdall.Core.Packages;
@@ -13,20 +14,20 @@ namespace Heimdall.Api.BinaryProxy;
 /// runs the single-version gate, then streams the upstream response body to the client without
 /// buffering. Emits an audit record for every decision.
 /// </summary>
-public sealed class BinaryProxyService
+public sealed class NuGetV3BinaryProxyService
 {
 	private const string Ecosystem = "nuget";
 
 	private readonly IFeedConfigLookup _lookup;
-	private readonly INuGetMetadataService _metadata;
-	private readonly INuGetUpstreamClient _upstream;
-	private readonly IUpstreamUrlResolver _urls;
+	private readonly INuGetV3MetadataService _metadata;
+	private readonly INuGetV3UpstreamClient _upstream;
+	private readonly INuGetV3UpstreamUrlResolver _urls;
 	private readonly ISingleVersionGate _gate;
 	private readonly TimeProvider _time;
 	private readonly AuditLogger _audit;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="BinaryProxyService"/> class.
+	/// Initializes a new instance of the <see cref="NuGetV3BinaryProxyService"/> class.
 	/// </summary>
 	/// <param name="lookup">Lookup that resolves the feed configuration by ecosystem and name.</param>
 	/// <param name="metadata">Metadata service used to obtain the registration leaf for the requested version.</param>
@@ -36,11 +37,11 @@ public sealed class BinaryProxyService
 	/// <param name="time">Time abstraction used to stamp the gate evaluation.</param>
 	/// <param name="audit">Audit logger that records the allow/deny decision.</param>
 	/// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
-	public BinaryProxyService(
+	public NuGetV3BinaryProxyService(
 		IFeedConfigLookup lookup,
-		INuGetMetadataService metadata,
-		INuGetUpstreamClient upstream,
-		IUpstreamUrlResolver urls,
+		INuGetV3MetadataService metadata,
+		INuGetV3UpstreamClient upstream,
+		INuGetV3UpstreamUrlResolver urls,
 		ISingleVersionGate gate,
 		TimeProvider time,
 		AuditLogger audit)
@@ -95,20 +96,20 @@ public sealed class BinaryProxyService
 			};
 		}
 
-		var leaf = await _metadata.GetVersionLeafAsync(feedName, packageId, version, ct).ConfigureAwait(false);
-		if (leaf?.CatalogEntry is null)
+		var leaf = await _metadata.GetVersionLeafAsync(feedName, packageId, version, ct);
+		if (leaf?.CatalogEntryV3 is null)
 		{
 			return new NotFoundResult();
 		}
 
-		var entry = leaf.CatalogEntry;
+		var entry = leaf.CatalogEntryV3;
 		if (!SemVersion.TryParse(entry.Version, SemVersionStyles.Any, out var sv))
 		{
 			return new NotFoundResult();
 		}
 
 		var coords = new PackageCoordinates(Ecosystem, entry.PackageId, sv);
-		var meta = new PackageVersionMetadata(coords, entry.Published, new Dictionary<string, string>());
+		var meta = new PackageVersionMetadata(coords, entry.PublishedUtc, new Dictionary<string, string>());
 
 		var verdict = _gate.Check(meta, feed, _time.GetUtcNow());
 		var ip = context.Connection.RemoteIpAddress?.ToString() ?? "-";
@@ -136,16 +137,16 @@ public sealed class BinaryProxyService
 			};
 		}
 
-		var packageBase = await _urls.GetPackageBaseAddressAsync(feed.Upstream, ct).ConfigureAwait(false);
+		var packageBase = await _urls.GetPackageBaseAddressAsync(feed.Upstream, ct);
 		var upstreamUri = new Uri(
 			packageBase,
 			$"{entry.PackageId.ToLowerInvariant()}/{entry.Version.ToLowerInvariant()}/{fileName}");
 
-		using var request = BuildUpstreamRequest(context.Request, upstreamUri);
-		var response = await _upstream.SendBinaryAsync(request, ct).ConfigureAwait(false);
+		using var request = HttpProxyHelpers.BuildUpstreamRequest(context.Request, upstreamUri);
+		var response = await _upstream.SendBinaryAsync(request, ct);
 
 		// Stream the upstream body straight into Response.Body to avoid buffering whole .nupkg files in memory.
-		await PipeResponseAsync(response, context, ct).ConfigureAwait(false);
+		await HttpProxyHelpers.PipeResponseAsync(response, context, ct);
 
 		if (response.IsSuccessStatusCode)
 		{
@@ -155,72 +156,4 @@ public sealed class BinaryProxyService
 		response.Dispose();
 		return null;
 	}
-
-	private static HttpRequestMessage BuildUpstreamRequest(HttpRequest source, Uri target)
-	{
-		var method = HttpMethods.IsHead(source.Method) ? HttpMethod.Head : HttpMethod.Get;
-		var req = new HttpRequestMessage(method, target);
-
-		foreach (var header in source.Headers)
-		{
-			if (HopByHopHeaders.Contains(header.Key))
-			{
-				continue;
-			}
-
-			req.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-		}
-
-		req.Headers.AcceptEncoding.Clear();
-
-		return req;
-	}
-
-	private static async Task PipeResponseAsync(
-		HttpResponseMessage response, HttpContext context, CancellationToken ct)
-	{
-		context.Response.StatusCode = (int)response.StatusCode;
-
-		foreach (var header in response.Headers)
-		{
-			if (HopByHopHeaders.Contains(header.Key))
-			{
-				continue;
-			}
-			context.Response.Headers[header.Key] = header.Value.ToArray();
-		}
-
-		foreach (var header in response.Content.Headers)
-		{
-			if (HopByHopHeaders.Contains(header.Key))
-			{
-				continue;
-			}
-			context.Response.Headers[header.Key] = header.Value.ToArray();
-		}
-
-		context.Response.Headers.Remove("transfer-encoding");
-
-		// HEAD and 304 responses must not carry a body per RFC 9110; skip copying upstream content.
-		if (HttpMethods.IsHead(context.Request.Method) || context.Response.StatusCode == 304)
-		{
-			return;
-		}
-
-		await using var upstream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-		await upstream.CopyToAsync(context.Response.Body, ct).ConfigureAwait(false);
-	}
-
-	private static readonly HashSet<string> HopByHopHeaders = new(StringComparer.OrdinalIgnoreCase)
-	{
-		"connection",
-		"keep-alive",
-		"proxy-authenticate",
-		"proxy-authorization",
-		"te",
-		"trailer",
-		"transfer-encoding",
-		"upgrade",
-		"host",
-	};
 }

@@ -8,16 +8,16 @@ namespace Heimdall.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("/nuget/{feed}/v3/flatcontainer")]
-public sealed class NuGetBinaryController : ControllerBase
+public sealed class NuGetV3BinaryController : ControllerBase
 {
-	private readonly BinaryProxyService _proxy;
+	private readonly NuGetV3BinaryProxyService _proxy;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="NuGetBinaryController"/> class.
+	/// Initializes a new instance of the <see cref="NuGetV3BinaryController"/> class.
 	/// </summary>
 	/// <param name="proxy">Service that evaluates the policy gate and streams the upstream binary to the client.</param>
 	/// <exception cref="ArgumentNullException">Thrown when <paramref name="proxy"/> is null.</exception>
-	public NuGetBinaryController(BinaryProxyService proxy)
+	public NuGetV3BinaryController(NuGetV3BinaryProxyService proxy)
 	{
 		ArgumentNullException.ThrowIfNull(proxy);
 		_proxy = proxy;
@@ -45,7 +45,7 @@ public sealed class NuGetBinaryController : ControllerBase
 	{
 		var problem = await _proxy.ProxyAsync(HttpContext, feed, packageId, version, fileName, ct);
 		// Returning EmptyResult prevents the MVC pipeline from overwriting the response body
-		// that BinaryProxyService has already streamed to the client.
+		// that NuGetV3BinaryProxyService has already streamed to the client.
 		return problem ?? new EmptyResult();
 	}
 }

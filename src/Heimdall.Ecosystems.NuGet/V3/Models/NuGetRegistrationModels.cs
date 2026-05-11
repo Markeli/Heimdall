@@ -5,7 +5,7 @@ namespace Heimdall.Ecosystems.NuGet.V3.Models;
 /// <summary>
 /// NuGet V3 registration index (wire format) — the top-level document for a package's versions.
 /// </summary>
-public sealed class RegistrationIndex
+public sealed class RegistrationIndexV3
 {
 	/// <summary>Absolute URL of this registration index (the <c>@id</c> field).</summary>
 	[JsonPropertyName("@id")]
@@ -17,14 +17,14 @@ public sealed class RegistrationIndex
 
 	/// <summary>Pages of registration leaves; large packages split versions across multiple pages.</summary>
 	[JsonPropertyName("items")]
-	public List<RegistrationPage> Items { get; set; } = [];
+	public List<RegistrationPageV3> Items { get; set; } = [];
 }
 
 /// <summary>
 /// NuGet V3 registration page (wire format). Either inlines its leaves via <see cref="Items"/> or
 /// requires a follow-up fetch by <see cref="Id"/>.
 /// </summary>
-public sealed class RegistrationPage
+public sealed class RegistrationPageV3
 {
 	/// <summary>Absolute URL of this page (used to fetch leaves when <see cref="Items"/> is null).</summary>
 	[JsonPropertyName("@id")]
@@ -49,13 +49,13 @@ public sealed class RegistrationPage
 	/// page must be re-fetched from <see cref="Id"/>.
 	/// </summary>
 	[JsonPropertyName("items")]
-	public List<RegistrationLeaf>? Items { get; set; }
+	public List<RegistrationLeafV3>? Items { get; set; }
 }
 
 /// <summary>
 /// NuGet V3 registration leaf (wire format) — one published version of a package.
 /// </summary>
-public sealed class RegistrationLeaf
+public sealed class RegistrationLeafV3
 {
 	/// <summary>Absolute URL of this leaf.</summary>
 	[JsonPropertyName("@id")]
@@ -63,7 +63,7 @@ public sealed class RegistrationLeaf
 
 	/// <summary>Catalog entry containing the version metadata used by Heimdall filters.</summary>
 	[JsonPropertyName("catalogEntry")]
-	public CatalogEntry? CatalogEntry { get; set; }
+	public CatalogEntryV3? CatalogEntryV3 { get; set; }
 
 	/// <summary>Absolute URL of the .nupkg content for this version.</summary>
 	[JsonPropertyName("packageContent")]
@@ -73,7 +73,7 @@ public sealed class RegistrationLeaf
 /// <summary>
 /// NuGet V3 catalog entry (wire format) — descriptive metadata for a single package version.
 /// </summary>
-public sealed class CatalogEntry
+public sealed class CatalogEntryV3
 {
 	/// <summary>Absolute URL identifying this catalog entry.</summary>
 	[JsonPropertyName("@id")]
@@ -89,7 +89,7 @@ public sealed class CatalogEntry
 
 	/// <summary>UTC timestamp the version was published; used by Heimdall age-based filters.</summary>
 	[JsonPropertyName("published")]
-	public DateTimeOffset? Published { get; set; }
+	public DateTimeOffset? PublishedUtc { get; set; }
 
 	/// <summary>Whether the version is listed on the upstream. Null is treated as listed.</summary>
 	[JsonPropertyName("listed")]

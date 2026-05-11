@@ -5,7 +5,7 @@ namespace Heimdall.Ecosystems.NuGet.V3;
 /// (<c>RegistrationsBaseUrl</c>, <c>PackageBaseAddress/3.0.0</c>, <c>SearchQueryService</c>).
 /// Implementations are expected to cache parsed service indexes to avoid repeated round trips.
 /// </summary>
-public interface IUpstreamUrlResolver
+public interface INuGetV3UpstreamUrlResolver
 {
 	/// <summary>
 	/// Returns the base URL of the registration resource, with a trailing slash, ready for concatenation.

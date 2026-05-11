@@ -8,7 +8,7 @@ namespace Heimdall.Ecosystems.NuGet.V3;
 /// Projects raw NuGet V3 payloads into Heimdall's domain shape (<see cref="PackageVersionMetadata"/>) so
 /// that ecosystem-agnostic filters can be applied uniformly.
 /// </summary>
-public static class NuGetMetadataProjection
+public static class NuGetV3MetadataProjection
 {
 	/// <summary>
 	/// Flattens a registration index's pages and leaves into a list of <see cref="PackageVersionMetadata"/>.
@@ -17,7 +17,7 @@ public static class NuGetMetadataProjection
 	/// <param name="index">Raw registration index from the upstream.</param>
 	/// <returns>Projected version metadata in the order the leaves were enumerated.</returns>
 	/// <exception cref="ArgumentNullException">Thrown when <paramref name="index"/> is null.</exception>
-	public static IReadOnlyList<PackageVersionMetadata> ToVersionMetadata(RegistrationIndex index)
+	public static IReadOnlyList<PackageVersionMetadata> ToVersionMetadata(RegistrationIndexV3 index)
 	{
 		ArgumentNullException.ThrowIfNull(index);
 
@@ -33,7 +33,7 @@ public static class NuGetMetadataProjection
 
 			foreach (var leaf in page.Items)
 			{
-				var entry = leaf.CatalogEntry;
+				var entry = leaf.CatalogEntryV3;
 				if (entry is null || string.IsNullOrEmpty(entry.PackageId) || string.IsNullOrEmpty(entry.Version))
 				{
 					continue;
@@ -51,7 +51,7 @@ public static class NuGetMetadataProjection
 					["listed"] = (entry.Listed ?? true) ? "true" : "false",
 				};
 
-				result.Add(new PackageVersionMetadata(coords, entry.Published, extra));
+				result.Add(new PackageVersionMetadata(coords, entry.PublishedUtc, extra));
 			}
 		}
 

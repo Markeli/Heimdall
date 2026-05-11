@@ -5,11 +5,11 @@ namespace Heimdall.Core.Packages;
 /// publication timestamp (when known) and any ecosystem-specific extra fields.
 /// </summary>
 /// <param name="Coords">Coordinates identifying the package version.</param>
-/// <param name="Published">Publication timestamp from the upstream catalog, when available.</param>
+/// <param name="PublishedUtc">Publication timestamp from the upstream catalog, when available.</param>
 /// <param name="Extra">Free-form ecosystem-specific metadata fields.</param>
 public sealed record PackageVersionMetadata(
 	PackageCoordinates Coords,
-	DateTimeOffset? Published,
+	DateTimeOffset? PublishedUtc,
 	IReadOnlyDictionary<string, string> Extra)
 {
 	/// <summary>

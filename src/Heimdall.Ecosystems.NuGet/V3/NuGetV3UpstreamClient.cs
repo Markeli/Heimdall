@@ -6,10 +6,10 @@ using Microsoft.Extensions.Logging;
 namespace Heimdall.Ecosystems.NuGet.V3;
 
 /// <summary>
-/// Default <see cref="INuGetUpstreamClient"/> implementation. Uses two named <see cref="HttpClient"/> instances:
+/// Default <see cref="INuGetV3UpstreamClient"/> implementation. Uses two named <see cref="HttpClient"/> instances:
 /// one tuned for metadata (gzip/deflate, JSON) and one for binary .nupkg streaming.
 /// </summary>
-public sealed class NuGetUpstreamClient : INuGetUpstreamClient
+public sealed class NuGetV3UpstreamClient : INuGetV3UpstreamClient
 {
 	/// <summary>Named HttpClient used for JSON metadata requests (service index, registration, search).</summary>
 	public const string MetadataHttpClientName = "Heimdall.NuGet.Metadata";
@@ -24,20 +24,20 @@ public sealed class NuGetUpstreamClient : INuGetUpstreamClient
 	};
 
 	private readonly IHttpClientFactory _factory;
-	private readonly ILogger<NuGetUpstreamClient> _logger;
-	private readonly IUpstreamUrlResolver _urls;
+	private readonly ILogger<NuGetV3UpstreamClient> _logger;
+	private readonly INuGetV3UpstreamUrlResolver _urls;
 
 	/// <summary>
-	/// Creates a new <see cref="NuGetUpstreamClient"/>.
+	/// Creates a new <see cref="NuGetV3UpstreamClient"/>.
 	/// </summary>
 	/// <param name="factory">Factory used to resolve the named HTTP clients.</param>
 	/// <param name="urls">Upstream URL resolver used to discover resource endpoints.</param>
 	/// <param name="logger">Logger.</param>
 	/// <exception cref="ArgumentNullException">Thrown when any dependency is null.</exception>
-	public NuGetUpstreamClient(
+	public NuGetV3UpstreamClient(
 		IHttpClientFactory factory,
-		IUpstreamUrlResolver urls,
-		ILogger<NuGetUpstreamClient> logger)
+		INuGetV3UpstreamUrlResolver urls,
+		ILogger<NuGetV3UpstreamClient> logger)
 	{
 		ArgumentNullException.ThrowIfNull(factory);
 		ArgumentNullException.ThrowIfNull(urls);
@@ -48,18 +48,18 @@ public sealed class NuGetUpstreamClient : INuGetUpstreamClient
 	}
 
 	/// <inheritdoc />
-	public async Task<RegistrationIndex?> GetRegistrationAsync(
+	public async Task<RegistrationIndexV3?> GetRegistrationAsync(
 		Uri serviceIndex, string packageId, CancellationToken ct)
 	{
 		ArgumentNullException.ThrowIfNull(serviceIndex);
 		ArgumentException.ThrowIfNullOrEmpty(packageId);
 
 		// NuGet flat-container and registration paths require the lowercased package id.
-		var url = await _urls.GetRegistrationBaseUrlAsync(serviceIndex, ct).ConfigureAwait(false);
+		var url = await _urls.GetRegistrationBaseUrlAsync(serviceIndex, ct);
 		var fullUrl = new Uri(url, $"{packageId.ToLowerInvariant()}/index.json");
 
 		var http = _factory.CreateClient(MetadataHttpClientName);
-		using var resp = await http.GetAsync(fullUrl, ct).ConfigureAwait(false);
+		using var resp = await http.GetAsync(fullUrl, ct);
 		if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
 		{
 			return null;
@@ -67,24 +67,24 @@ public sealed class NuGetUpstreamClient : INuGetUpstreamClient
 
 		resp.EnsureSuccessStatusCode();
 
-		await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-		return await JsonSerializer.DeserializeAsync<RegistrationIndex>(stream, JsonOptions, ct)
-			.ConfigureAwait(false);
+		await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+		return await JsonSerializer.DeserializeAsync<RegistrationIndexV3>(stream, JsonOptions, ct)
+			;
 	}
 
 	/// <inheritdoc />
-	public async Task<SearchResult?> SearchAsync(
+	public async Task<SearchResultV3?> SearchAsync(
 		Uri serviceIndex, string query, int skip, int take, bool includePrerelease, CancellationToken ct)
 	{
 		ArgumentNullException.ThrowIfNull(serviceIndex);
 
-		var baseUrl = await _urls.GetSearchQueryServiceAsync(serviceIndex, ct).ConfigureAwait(false);
+		var baseUrl = await _urls.GetSearchQueryServiceAsync(serviceIndex, ct);
 		var qs = $"?q={Uri.EscapeDataString(query ?? "")}"
 			+ $"&skip={skip}&take={take}&prerelease={(includePrerelease ? "true" : "false")}";
 		var fullUrl = new Uri(baseUrl + qs);
 
 		var http = _factory.CreateClient(MetadataHttpClientName);
-		using var resp = await http.GetAsync(fullUrl, ct).ConfigureAwait(false);
+		using var resp = await http.GetAsync(fullUrl, ct);
 		if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
 		{
 			return null;
@@ -92,7 +92,7 @@ public sealed class NuGetUpstreamClient : INuGetUpstreamClient
 
 		resp.EnsureSuccessStatusCode();
 
-		return await resp.Content.ReadFromJsonAsync<SearchResult>(JsonOptions, ct).ConfigureAwait(false);
+		return await resp.Content.ReadFromJsonAsync<SearchResultV3>(JsonOptions, ct);
 	}
 
 	/// <inheritdoc />
