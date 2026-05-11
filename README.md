@@ -32,6 +32,18 @@ dotnet run --project src/Heimdall.Api
 
 The server listens on `http://localhost:8080`. Configuration sits next to `Heimdall.Api.dll` as `config.yml`, with optional `config.{Environment}.yml` and `config.secret.yml` (gitignored) overrides on top. All files are hot-reloaded on change.
 
+## Build (Cake)
+
+Build, test, and publish go through Cake so local and Docker builds produce identical artifacts.
+
+```sh
+dotnet tool restore
+dotnet cake --target=Test      # restore + build + test
+dotnet cake --target=Publish   # produces ./artifacts/publish/
+```
+
+The Docker image (`src/Heimdall.Api/Dockerfile`) calls the same `Publish` target inside the SDK image.
+
 ## Wiring up a client
 
 ```sh
