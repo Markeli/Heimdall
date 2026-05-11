@@ -1,5 +1,7 @@
 # Heimdall
 
+![CI](https://github.com/Markeli/Heimdall/actions/workflows/ci.yml/badge.svg)
+
 Internal proxy for public package repositories (NuGet — MVP; npm/Maven later) with filtering rules (minimum version age, allow/deny by package name). Package files are streamed through; metadata is cached in memory.
 
 ## Stack
@@ -120,3 +122,31 @@ docker run --rm -p 8080:8080 -v $(pwd)/config.yml:/app/config.yml heimdall:dev
 - Multi-instance scaling.
 
 See `/Users/markelow/.claude/plans/expressive-skipping-beacon.md` — the final architectural plan.
+
+## Releases
+
+Heimdall uses [Semantic Versioning](https://semver.org/) with
+[MinVer](https://github.com/adamralph/minver) deriving assembly versions from
+`v*.*.*` git tags. Pushing a tag of the form `vX.Y.Z` triggers the `release`
+workflow, which:
+
+- re-runs the full test suite,
+- builds and pushes the container image to GHCR:
+  - `ghcr.io/markeli/heimdall:X.Y.Z`
+  - `ghcr.io/markeli/heimdall:latest`
+- creates a GitHub Release whose body is the matching `[X.Y.Z]` section of
+  [`CHANGELOG.md`](CHANGELOG.md).
+
+Pull the latest stable image with:
+
+```sh
+docker pull ghcr.io/markeli/heimdall:latest
+```
+
+The full release procedure lives in [`CONTRIBUTING.md`](CONTRIBUTING.md#5-releasing).
+
+## Contributing
+
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a PR. AI agents
+working on this repo must also follow [`AGENTS.md`](AGENTS.md), which mirrors
+the same rules in a machine-readable form.

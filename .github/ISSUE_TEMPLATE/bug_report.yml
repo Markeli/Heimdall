@@ -1,0 +1,52 @@
+name: Bug report
+description: Something behaves incorrectly in Heimdall.
+title: "[bug] <one-line summary>"
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One paragraph describing what went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Minimum steps to reproduce. Include configuration snippets
+        (`config.yml`) and the exact `dotnet` / `curl` / `dotnet nuget` commands.
+      placeholder: |
+        1. Start Heimdall with this config: ...
+        2. Run: `curl -sf http://localhost:8080/nuget/strict/v3/index.json`
+        3. Observe: ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Image tag (`ghcr.io/markeli/heimdall:X.Y.Z`) or commit SHA
+        you built locally.
+      placeholder: "ghcr.io/markeli/heimdall:0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / metrics
+      description: Paste relevant Serilog JSON lines, `/metrics` excerpts,
+        or stack traces. Redact anything sensitive.
+      render: text

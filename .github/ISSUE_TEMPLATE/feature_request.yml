@@ -1,0 +1,31 @@
+name: Feature request
+description: Propose a new capability or behaviour change.
+title: "[feature] <one-line summary>"
+labels: [enhancement]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem does this solve? Who feels the pain today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Sketch the desired behaviour. Include API/CLI/config shape
+        if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you weighed and why you didn't pick them.
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope / out of scope
+      description: Explicitly call out what is *not* part of this proposal so
+        reviewers can scope the work.
