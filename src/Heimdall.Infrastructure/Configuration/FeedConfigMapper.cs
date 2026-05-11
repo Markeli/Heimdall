@@ -2,6 +2,11 @@ using Heimdall.Core.Configuration;
 
 namespace Heimdall.Infrastructure.Configuration;
 
+/// <summary>
+/// Maps the YAML-bound <see cref="HeimdallOptions"/> shape onto the immutable
+/// <see cref="FeedConfig"/> records exposed by Heimdall.Core. Assumes options have
+/// already been validated by <see cref="HeimdallOptionsValidator"/>.
+/// </summary>
 internal static class FeedConfigMapper
 {
 	public static IReadOnlyList<FeedConfig> Map(HeimdallOptions options)
@@ -24,6 +29,7 @@ internal static class FeedConfigMapper
 		{
 			if (!rule.TryGetValue("type", out var type) || string.IsNullOrWhiteSpace(type))
 			{
+				// Validator guarantees rule.type is present; reaching here means the validator was bypassed.
 				throw new InvalidOperationException("rule.type is required (validated upstream)");
 			}
 

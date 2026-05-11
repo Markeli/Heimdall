@@ -8,8 +8,19 @@ using Microsoft.Extensions.Options;
 
 namespace Heimdall.Ecosystems.NuGet.DependencyInjection;
 
+/// <summary>
+/// DI registration helpers for the NuGet ecosystem: URL resolver, upstream client, transformer,
+/// metadata service, and the two named HTTP clients (metadata and binary) with resilience policies.
+/// </summary>
 public static class NuGetEcosystemServiceCollectionExtensions
 {
+	/// <summary>
+	/// Registers the NuGet ecosystem services and configures the metadata and binary HTTP clients with
+	/// retries, timeouts, and circuit breakers via <c>AddStandardResilienceHandler</c>.
+	/// </summary>
+	/// <param name="services">Service collection to extend.</param>
+	/// <returns>The same <paramref name="services"/> instance for chaining.</returns>
+	/// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> is null.</exception>
 	public static IServiceCollection AddNuGetEcosystem(this IServiceCollection services)
 	{
 		ArgumentNullException.ThrowIfNull(services);
@@ -25,6 +36,7 @@ public static class NuGetEcosystemServiceCollectionExtensions
 		services.TryAddSingleton<NuGetMetadataTransformer>();
 		services.TryAddSingleton<INuGetMetadataService, NuGetMetadataService>();
 
+		// Metadata client: small JSON payloads, gzip/deflate negotiated, aggressive retries are safe.
 		services.AddHttpClient(NuGetUpstreamClient.MetadataHttpClientName)
 			.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
 			{
@@ -45,6 +57,8 @@ public static class NuGetEcosystemServiceCollectionExtensions
 				opts.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(30);
 			});
 
+		// Binary client: streams .nupkg payloads which may be large; decompression is off because the
+		// content must be passed through to the caller byte-for-byte, and timeouts are much higher.
 		services.AddHttpClient(NuGetUpstreamClient.BinaryHttpClientName)
 			.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
 			{

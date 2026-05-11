@@ -3,11 +3,23 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Heimdall.Api.Health;
 
+/// <summary>
+/// Readiness health check that probes the configured upstream service indexes. Registered under the
+/// <c>"ready"</c> tag so it participates in the <c>/readyz</c> endpoint only.
+/// </summary>
 public sealed class UpstreamReadinessCheck : IHealthCheck
 {
 	private readonly IConfigSnapshotProvider _snapshots;
 	private readonly IHttpClientFactory _factory;
 
+	/// <summary>
+	/// Initializes a new instance of the <see cref="UpstreamReadinessCheck"/> class.
+	/// </summary>
+	/// <param name="snapshots">Provider that exposes the current feed configuration snapshot.</param>
+	/// <param name="factory">HTTP client factory used to obtain a short-timeout client for the probes.</param>
+	/// <exception cref="ArgumentNullException">
+	/// Thrown when <paramref name="snapshots"/> or <paramref name="factory"/> is null.
+	/// </exception>
 	public UpstreamReadinessCheck(IConfigSnapshotProvider snapshots, IHttpClientFactory factory)
 	{
 		ArgumentNullException.ThrowIfNull(snapshots);
@@ -16,6 +28,15 @@ public sealed class UpstreamReadinessCheck : IHealthCheck
 		_factory = factory;
 	}
 
+	/// <summary>
+	/// Issues an HTTP GET (reading headers only) to every configured upstream and aggregates the outcome.
+	/// </summary>
+	/// <param name="context">Standard health check context provided by the framework.</param>
+	/// <param name="cancellationToken">Token used to cancel the probes.</param>
+	/// <returns>
+	/// <see cref="HealthCheckResult.Healthy(string,System.Collections.Generic.IReadOnlyDictionary{string,object})"/>
+	/// when every upstream is reachable; otherwise an unhealthy result describing the failures.
+	/// </returns>
 	public async Task<HealthCheckResult> CheckHealthAsync(
 		HealthCheckContext context, CancellationToken cancellationToken = default)
 	{

@@ -2,8 +2,15 @@ using Microsoft.Extensions.Options;
 
 namespace Heimdall.Infrastructure.Configuration;
 
+/// <summary>
+/// Validates <see cref="HeimdallOptions"/> at startup and on every reload. Errors here
+/// are fatal because downstream components assume a structurally-correct config (valid
+/// upstream URIs, present rule types, unique feed names, etc.).
+/// </summary>
 public sealed class HeimdallOptionsValidator : IValidateOptions<HeimdallOptions>
 {
+	/// <inheritdoc />
+	/// <exception cref="ArgumentNullException"><paramref name="options"/> is <c>null</c>.</exception>
 	public ValidateOptionsResult Validate(string? name, HeimdallOptions options)
 	{
 		ArgumentNullException.ThrowIfNull(options);

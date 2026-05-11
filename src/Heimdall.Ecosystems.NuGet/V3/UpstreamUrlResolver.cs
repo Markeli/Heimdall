@@ -5,6 +5,10 @@ using Heimdall.Ecosystems.NuGet.V3.Models;
 
 namespace Heimdall.Ecosystems.NuGet.V3;
 
+/// <summary>
+/// Default <see cref="IUpstreamUrlResolver"/>: fetches and caches an upstream's service index by URL,
+/// then locates known resource types within it.
+/// </summary>
 public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 {
 	private static readonly JsonSerializerOptions JsonOptions = new()
@@ -12,6 +16,8 @@ public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 		PropertyNameCaseInsensitive = true,
 	};
 
+	// 3.6.0 is the modern semver2 + gzip variant exposed by nuget.org. The "/Versioned" alias is
+	// preferred as a fallback because some private feeds publish it without the explicit 3.6.0 suffix.
 	private const string RegistrationsBaseUrlSemver2 = "RegistrationsBaseUrl/3.6.0";
 	private const string RegistrationsBaseUrlGzSemver2 = "RegistrationsBaseUrl/Versioned";
 	private const string PackageBaseAddress = "PackageBaseAddress/3.0.0";
@@ -20,12 +26,18 @@ public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 	private readonly IHttpClientFactory _factory;
 	private readonly ConcurrentDictionary<string, ServiceIndex> _cache = new();
 
+	/// <summary>
+	/// Creates a new <see cref="UpstreamUrlResolver"/>.
+	/// </summary>
+	/// <param name="factory">Factory used to resolve the metadata HTTP client.</param>
+	/// <exception cref="ArgumentNullException">Thrown when <paramref name="factory"/> is null.</exception>
 	public UpstreamUrlResolver(IHttpClientFactory factory)
 	{
 		ArgumentNullException.ThrowIfNull(factory);
 		_factory = factory;
 	}
 
+	/// <inheritdoc />
 	public async Task<Uri> GetRegistrationBaseUrlAsync(Uri serviceIndex, CancellationToken ct)
 	{
 		var index = await GetServiceIndexAsync(serviceIndex, ct).ConfigureAwait(false);
@@ -36,6 +48,7 @@ public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 		return new Uri(EnsureTrailingSlash(url));
 	}
 
+	/// <inheritdoc />
 	public async Task<Uri> GetPackageBaseAddressAsync(Uri serviceIndex, CancellationToken ct)
 	{
 		var index = await GetServiceIndexAsync(serviceIndex, ct).ConfigureAwait(false);
@@ -45,6 +58,7 @@ public sealed class UpstreamUrlResolver : IUpstreamUrlResolver
 		return new Uri(EnsureTrailingSlash(url));
 	}
 
+	/// <inheritdoc />
 	public async Task<string> GetSearchQueryServiceAsync(Uri serviceIndex, CancellationToken ct)
 	{
 		var index = await GetServiceIndexAsync(serviceIndex, ct).ConfigureAwait(false);

@@ -4,8 +4,18 @@ using Heimdall.Core.Packages;
 
 namespace Heimdall.Core.Filtering.Rules;
 
+/// <summary>
+/// Glob-based allow/deny rule on package identifier. Patterns use <c>*</c> and <c>?</c> and
+/// are matched case-insensitively. A leading <c>!</c> marks a deny-pattern.
+/// </summary>
+/// <remarks>
+/// Semantics (see README): any deny match rejects the package. If at least one allow
+/// pattern is present, the package must match one of them, otherwise it is denied.
+/// Deny-only configurations allow everything not explicitly denied.
+/// </remarks>
 public sealed class AllowDenyRule : IRule
 {
+	/// <summary>Stable rule discriminator used in configuration and deny reasons.</summary>
 	public const string RuleName = "allowDeny";
 
 	private readonly List<Regex> _allow;
@@ -13,6 +23,13 @@ public sealed class AllowDenyRule : IRule
 	private readonly List<string> _allowSources;
 	private readonly List<string> _denySources;
 
+	/// <summary>
+	/// Creates a new <see cref="AllowDenyRule"/> from raw glob patterns. Blank entries are
+	/// ignored. Patterns starting with <c>!</c> are treated as deny.
+	/// </summary>
+	/// <param name="patterns">Raw glob patterns; allow by default, <c>!</c>-prefixed for deny.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="patterns"/> is <c>null</c>.</exception>
+	/// <exception cref="ArgumentException">A pattern is just <c>!</c> with no body.</exception>
 	public AllowDenyRule(IReadOnlyList<string> patterns)
 	{
 		ArgumentNullException.ThrowIfNull(patterns);
@@ -53,14 +70,18 @@ public sealed class AllowDenyRule : IRule
 		_denySources = denySrc;
 	}
 
+	/// <inheritdoc />
 	public string Name => RuleName;
 
+	/// <inheritdoc />
+	/// <exception cref="ArgumentNullException"><paramref name="meta"/> is <c>null</c>.</exception>
 	public RuleVerdict Evaluate(PackageVersionMetadata meta, RuleContext ctx)
 	{
 		ArgumentNullException.ThrowIfNull(meta);
 
 		var id = meta.Coords.Id;
 
+		// Deny wins: a single deny match is enough to reject before any allow check.
 		for (var i = 0; i < _deny.Count; i++)
 		{
 			if (_deny[i].IsMatch(id))
@@ -69,6 +90,7 @@ public sealed class AllowDenyRule : IRule
 			}
 		}
 
+		// Deny-only configuration: anything not explicitly denied is allowed.
 		if (_allow.Count == 0)
 		{
 			return RuleVerdict.Allow;

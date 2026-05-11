@@ -5,6 +5,10 @@ using Heimdall.Ecosystems.NuGet.V3.Models;
 
 namespace Heimdall.Ecosystems.NuGet.V3;
 
+/// <summary>
+/// Default <see cref="INuGetMetadataService"/>: orchestrates upstream fetches, runs configured filters,
+/// rewrites URLs through Heimdall, and memoizes registration documents in <see cref="IMetadataCache"/>.
+/// </summary>
 public sealed class NuGetMetadataService : INuGetMetadataService
 {
 	private const string Ecosystem = "nuget";
@@ -16,6 +20,16 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 	private readonly NuGetMetadataTransformer _transformer;
 	private readonly NuGetUrlRewriter _urls;
 
+	/// <summary>
+	/// Creates a new <see cref="NuGetMetadataService"/>.
+	/// </summary>
+	/// <param name="lookup">Lookup for feed configuration by ecosystem and feed name.</param>
+	/// <param name="snapshots">Provider of monotonic configuration snapshots used to key the cache.</param>
+	/// <param name="upstream">Typed upstream HTTP client.</param>
+	/// <param name="cache">Per-feed metadata cache.</param>
+	/// <param name="transformer">Filter-and-rewrite transformer.</param>
+	/// <param name="urls">Heimdall-facing URL rewriter.</param>
+	/// <exception cref="ArgumentNullException">Thrown when any dependency is null.</exception>
 	public NuGetMetadataService(
 		IFeedConfigLookup lookup,
 		IConfigSnapshotProvider snapshots,
@@ -39,11 +53,15 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 		_urls = urls;
 	}
 
+	/// <inheritdoc />
 	public bool TryGetFeed(string feedName, out FeedConfig? feed) =>
 		_lookup.TryGet(Ecosystem, feedName, out feed);
 
+	/// <inheritdoc />
 	public string BuildServiceIndexJson(string feedName)
 	{
+		// Clients must talk to Heimdall, never to the upstream directly, so every resource URL
+		// advertised here is a Heimdall URL produced by NuGetUrlRewriter.
 		var index = new ServiceIndex
 		{
 			Version = "3.0.0",
@@ -73,6 +91,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 		return JsonSerializer.Serialize(index, JsonOptions);
 	}
 
+	/// <inheritdoc />
 	public async Task<string?> GetVersionsListJsonAsync(string feedName, string packageId, CancellationToken ct)
 	{
 		var registration = await GetRegistrationFromCacheOrUpstreamAsync(feedName, packageId, ct).ConfigureAwait(false);
@@ -85,6 +104,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 		return _transformer.BuildVersionsListJson(registration, feed);
 	}
 
+	/// <inheritdoc />
 	public async Task<string?> GetRegistrationJsonAsync(string feedName, string packageId, CancellationToken ct)
 	{
 		var registration = await GetRegistrationFromCacheOrUpstreamAsync(feedName, packageId, ct).ConfigureAwait(false);
@@ -97,6 +117,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 		return _transformer.RewriteRegistration(registration, feed);
 	}
 
+	/// <inheritdoc />
 	public async Task<string?> SearchJsonAsync(
 		string feedName, string? query, int skip, int take, bool includePrerelease, CancellationToken ct)
 	{
@@ -111,6 +132,7 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 		return _transformer.RewriteSearch(result, feed);
 	}
 
+	/// <inheritdoc />
 	public async Task<RegistrationLeaf?> GetVersionLeafAsync(
 		string feedName, string packageId, string version, CancellationToken ct)
 	{
@@ -144,6 +166,8 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 		var feed = RequireFeed(feedName);
 		var snapshot = _snapshots.Capture();
 
+		// Including the snapshot generation in the cache key invalidates entries automatically
+		// whenever feed configuration changes. Package IDs are lowercased to match NuGet's normalization.
 		var key = $"g{snapshot.Generation}:{Ecosystem}:{feedName}:reg:{packageId.ToLowerInvariant()}";
 		var cached = await _cache.GetAsync<RegistrationIndex>(key, ct).ConfigureAwait(false);
 		if (cached is not null)
@@ -177,8 +201,16 @@ public sealed class NuGetMetadataService : INuGetMetadataService
 	};
 }
 
+/// <summary>
+/// Thrown by <see cref="NuGetMetadataService"/> when a feed name is not registered in the configured ecosystem.
+/// </summary>
 public sealed class FeedNotFoundException : Exception
 {
+	/// <summary>
+	/// Creates a new <see cref="FeedNotFoundException"/>.
+	/// </summary>
+	/// <param name="ecosystem">Ecosystem identifier (e.g. <c>nuget</c>).</param>
+	/// <param name="feedName">Feed name that could not be resolved.</param>
 	public FeedNotFoundException(string ecosystem, string feedName)
 		: base($"feed '{feedName}' not found in ecosystem '{ecosystem}'")
 	{
@@ -186,6 +218,9 @@ public sealed class FeedNotFoundException : Exception
 		FeedName = feedName;
 	}
 
+	/// <summary>Ecosystem identifier the lookup was performed in.</summary>
 	public string Ecosystem { get; }
+
+	/// <summary>Feed name that was not found.</summary>
 	public string FeedName { get; }
 }

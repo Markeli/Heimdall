@@ -21,12 +21,14 @@ internal static class GlobMatcher
 					sb.Append('.');
 					break;
 				default:
+					// Every non-wildcard character is escaped so regex metacharacters in IDs are matched literally.
 					sb.Append(Regex.Escape(ch.ToString()));
 					break;
 			}
 		}
 		sb.Append('$');
 
+		// 50 ms timeout guards against pathological inputs; IgnoreCase matches README semantics.
 		return new Regex(
 			sb.ToString(),
 			RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,

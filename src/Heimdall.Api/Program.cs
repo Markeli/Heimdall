@@ -9,6 +9,8 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Order matters: base YAML loads first, the per-environment file overrides it, and HEIMDALL_* env
+// vars override both so deployments can tune settings without rebuilding the image.
 builder.Configuration
 	.SetBasePath(builder.Environment.ContentRootPath)
 	.AddYamlFile("heimdall.yaml", optional: true, reloadOnChange: true)
@@ -43,4 +45,8 @@ app.MapMetrics();
 
 app.Run();
 
+/// <summary>
+/// Program entry partial declaration that exists solely to expose the top-level <c>Program</c> type
+/// to <c>WebApplicationFactory&lt;Program&gt;</c> used by integration tests.
+/// </summary>
 public partial class Program;

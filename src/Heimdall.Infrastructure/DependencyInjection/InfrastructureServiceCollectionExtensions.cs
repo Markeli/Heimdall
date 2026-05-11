@@ -10,8 +10,20 @@ using Microsoft.Extensions.Options;
 
 namespace Heimdall.Infrastructure.DependencyInjection;
 
+/// <summary>
+/// DI registration entry point for the Heimdall.Infrastructure layer.
+/// </summary>
 public static class InfrastructureServiceCollectionExtensions
 {
+	/// <summary>
+	/// Registers Heimdall infrastructure services: options binding and validation,
+	/// the in-process memory cache, the L1/L2 hybrid metadata cache, the config
+	/// generation counter, the snapshot provider, and the feed config lookup.
+	/// </summary>
+	/// <param name="services">Target service collection.</param>
+	/// <param name="configuration">Configuration root containing the <c>heimdall</c> section.</param>
+	/// <returns>The same <paramref name="services"/> instance, for chaining.</returns>
+	/// <exception cref="ArgumentNullException">Either argument is <c>null</c>.</exception>
 	public static IServiceCollection AddHeimdallInfrastructure(
 		this IServiceCollection services,
 		IConfiguration configuration)

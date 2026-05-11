@@ -3,10 +3,18 @@ using Heimdall.Core.Configuration;
 
 namespace Heimdall.Core.Filtering.Rules;
 
+/// <summary>
+/// Builder for <see cref="MinAgeDaysRule"/>. Reads the required <c>days</c> parameter and
+/// parses it as a non-negative invariant-culture integer.
+/// </summary>
 public sealed class MinAgeDaysRuleBuilder : IRuleBuilder
 {
+	/// <inheritdoc />
 	public string Type => MinAgeDaysRule.RuleName;
 
+	/// <inheritdoc />
+	/// <exception cref="ArgumentNullException"><paramref name="config"/> is <c>null</c>.</exception>
+	/// <exception cref="ArgumentException">The <c>days</c> parameter is missing, not an integer, or negative.</exception>
 	public IRule Build(RuleConfig config)
 	{
 		ArgumentNullException.ThrowIfNull(config);

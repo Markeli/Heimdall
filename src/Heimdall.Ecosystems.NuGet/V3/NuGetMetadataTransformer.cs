@@ -7,12 +7,23 @@ using Heimdall.Ecosystems.NuGet.V3.Models;
 
 namespace Heimdall.Ecosystems.NuGet.V3;
 
+/// <summary>
+/// Applies version filters to projected NuGet metadata and rewrites the surviving upstream URLs so they
+/// point at Heimdall's public endpoints rather than the upstream feed.
+/// </summary>
 public sealed class NuGetMetadataTransformer
 {
 	private readonly NuGetUrlRewriter _urls;
 	private readonly IVersionListFilter _filter;
 	private readonly TimeProvider _time;
 
+	/// <summary>
+	/// Creates a new <see cref="NuGetMetadataTransformer"/>.
+	/// </summary>
+	/// <param name="urls">Heimdall-facing URL rewriter.</param>
+	/// <param name="filter">Filter applied to projected version metadata.</param>
+	/// <param name="time">Time provider used for age-based filter evaluation.</param>
+	/// <exception cref="ArgumentNullException">Thrown when any dependency is null.</exception>
 	public NuGetMetadataTransformer(NuGetUrlRewriter urls, IVersionListFilter filter, TimeProvider time)
 	{
 		ArgumentNullException.ThrowIfNull(urls);
@@ -23,6 +34,14 @@ public sealed class NuGetMetadataTransformer
 		_time = time;
 	}
 
+	/// <summary>
+	/// Builds the flat-container <c>index.json</c> body: an object with a single <c>versions</c> array
+	/// containing only versions that pass the filter.
+	/// </summary>
+	/// <param name="registration">Upstream registration index for the package.</param>
+	/// <param name="feed">Feed configuration whose filter rules apply.</param>
+	/// <returns>Serialized JSON for the versions list.</returns>
+	/// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
 	public string BuildVersionsListJson(RegistrationIndex registration, FeedConfig feed)
 	{
 		ArgumentNullException.ThrowIfNull(registration);
@@ -44,6 +63,17 @@ public sealed class NuGetMetadataTransformer
 		return doc.ToJsonString();
 	}
 
+	/// <summary>
+	/// Rewrites a registration index so that surviving leaves point at Heimdall URLs. Filtered-out
+	/// versions are dropped and the index is collapsed into a single page covering the kept range.
+	/// </summary>
+	/// <param name="registration">Upstream registration index.</param>
+	/// <param name="feed">Feed configuration whose filter rules and name apply.</param>
+	/// <returns>Serialized JSON of the rewritten registration index.</returns>
+	/// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
+	/// <exception cref="InvalidOperationException">
+	/// Thrown when the upstream registration index contains no leaves to identify the package by.
+	/// </exception>
 	public string RewriteRegistration(RegistrationIndex registration, FeedConfig feed)
 	{
 		ArgumentNullException.ThrowIfNull(registration);
@@ -81,6 +111,8 @@ public sealed class NuGetMetadataTransformer
 					continue;
 				}
 
+				// Every @id and packageContent URL is rewritten so that clients fetch through Heimdall
+				// rather than following links back to nuget.org directly.
 				keptLeaves.Add(new RegistrationLeaf
 				{
 					Id = _urls.RegistrationLeaf(feed.Name, entry.PackageId, entry.Version).ToString(),
@@ -117,6 +149,15 @@ public sealed class NuGetMetadataTransformer
 		return JsonSerializer.Serialize(rewritten, JsonOptions);
 	}
 
+	/// <summary>
+	/// Rewrites a <c>SearchQueryService</c> response: hits whose versions are entirely filtered out
+	/// are removed, surviving hits have their @id, registration, and per-version URLs pointed at Heimdall,
+	/// and the primary version is set to the last surviving entry.
+	/// </summary>
+	/// <param name="upstream">Raw upstream search result.</param>
+	/// <param name="feed">Feed configuration whose filter rules and name apply.</param>
+	/// <returns>Serialized JSON of the rewritten search result.</returns>
+	/// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
 	public string RewriteSearch(SearchResult upstream, FeedConfig feed)
 	{
 		ArgumentNullException.ThrowIfNull(upstream);
@@ -136,6 +177,8 @@ public sealed class NuGetMetadataTransformer
 				continue;
 			}
 
+			// Search hits arrive ordered with the newest version last, so the last surviving entry
+			// is the best candidate for the hit's primary "version" field.
 			var primary = keptVersions[^1].Version;
 			passedHits.Add(new SearchHit
 			{
@@ -171,6 +214,8 @@ public sealed class NuGetMetadataTransformer
 			{
 				continue;
 			}
+			// Search hits do not carry per-version publish timestamps; age-based filters that
+			// require Published will treat these as unknown.
 			result.Add(new PackageVersionMetadata(
 				new PackageCoordinates("nuget", hit.PackageId, sv),
 				Published: null,

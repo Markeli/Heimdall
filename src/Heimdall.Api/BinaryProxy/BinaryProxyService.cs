@@ -8,6 +8,11 @@ using Semver;
 
 namespace Heimdall.Api.BinaryProxy;
 
+/// <summary>
+/// Coordinates the policy-gated proxying of NuGet <c>.nupkg</c> downloads. Resolves the version,
+/// runs the single-version gate, then streams the upstream response body to the client without
+/// buffering. Emits an audit record for every decision.
+/// </summary>
 public sealed class BinaryProxyService
 {
 	private const string Ecosystem = "nuget";
@@ -20,6 +25,17 @@ public sealed class BinaryProxyService
 	private readonly TimeProvider _time;
 	private readonly AuditLogger _audit;
 
+	/// <summary>
+	/// Initializes a new instance of the <see cref="BinaryProxyService"/> class.
+	/// </summary>
+	/// <param name="lookup">Lookup that resolves the feed configuration by ecosystem and name.</param>
+	/// <param name="metadata">Metadata service used to obtain the registration leaf for the requested version.</param>
+	/// <param name="upstream">HTTP client wrapper used to issue the binary request to the upstream feed.</param>
+	/// <param name="urls">Resolver that returns the package base address of the upstream feed.</param>
+	/// <param name="gate">Filtering gate that decides whether the requested version is allowed.</param>
+	/// <param name="time">Time abstraction used to stamp the gate evaluation.</param>
+	/// <param name="audit">Audit logger that records the allow/deny decision.</param>
+	/// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
 	public BinaryProxyService(
 		IFeedConfigLookup lookup,
 		INuGetMetadataService metadata,
@@ -45,6 +61,22 @@ public sealed class BinaryProxyService
 		_audit = audit;
 	}
 
+	/// <summary>
+	/// Evaluates the policy gate for the requested package version and, when allowed, streams the
+	/// upstream binary response directly to the client. When denied or not found, returns a
+	/// ProblemDetails action result that the controller can return as-is.
+	/// </summary>
+	/// <param name="context">Current HTTP context; used to read request headers and write the response.</param>
+	/// <param name="feedName">Configured logical feed name.</param>
+	/// <param name="packageId">NuGet package identifier from the route (case-insensitive).</param>
+	/// <param name="version">Package version from the route (case-insensitive).</param>
+	/// <param name="fileName">Final URL segment, typically <c>{id}.{version}.nupkg</c>.</param>
+	/// <param name="ct">Token used to cancel the upstream call and response streaming.</param>
+	/// <returns>
+	/// <c>null</c> when the response has been streamed and the controller should produce no further
+	/// content; otherwise a ProblemDetails result describing why the request was rejected.
+	/// </returns>
+	/// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is null.</exception>
 	public async Task<IActionResult?> ProxyAsync(
 		HttpContext context, string feedName, string packageId, string version, string fileName, CancellationToken ct)
 	{
@@ -112,6 +144,7 @@ public sealed class BinaryProxyService
 		using var request = BuildUpstreamRequest(context.Request, upstreamUri);
 		var response = await _upstream.SendBinaryAsync(request, ct).ConfigureAwait(false);
 
+		// Stream the upstream body straight into Response.Body to avoid buffering whole .nupkg files in memory.
 		await PipeResponseAsync(response, context, ct).ConfigureAwait(false);
 
 		if (response.IsSuccessStatusCode)
@@ -168,6 +201,7 @@ public sealed class BinaryProxyService
 
 		context.Response.Headers.Remove("transfer-encoding");
 
+		// HEAD and 304 responses must not carry a body per RFC 9110; skip copying upstream content.
 		if (HttpMethods.IsHead(context.Request.Method) || context.Response.StatusCode == 304)
 		{
 			return;
