@@ -58,15 +58,106 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push image to GHCR
+      # Build the release image LOCALLY first (load: true, push: false) so we can run
+      # the smoke suite against the exact bytes that will ship. Pushing only happens
+      # after smoke passes — otherwise a red smoke run would leave :latest already
+      # advertised in GHCR with no clean way to retract (see AGENTS.md: no
+      # delete-and-re-push of tags).
+      - name: Build release image (local, not pushed yet)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: src/Heimdall.Api/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/markeli/heimdall:${{ steps.ver.outputs.version }}
-            ghcr.io/markeli/heimdall:latest
+          push: false
+          load: true
+          tags: heimdall:smoke
+
+      # Compute the age-locked feed's minAgeDays threshold from a real publication
+      # anchor (Newtonsoft.Json 12.0.3, published 2019-11-09T01:27:30Z): threshold =
+      # (now - published).days + 1 guarantees the rule rejects 12.0.3 (and every
+      # younger version) on every CI run, regardless of when the release is cut.
+      - name: Render smoke config with dynamic age threshold
+        env:
+          ANCHOR_PUBLISHED_AT: "2019-11-09T01:27:30Z"
+        run: |
+          set -euo pipefail
+          published_epoch=$(date -u -d "$ANCHOR_PUBLISHED_AT" +%s)
+          now_epoch=$(date -u +%s)
+          age_days=$(( (now_epoch - published_epoch) / 86400 ))
+          age_lock_days=$(( age_days + 1 ))
+          echo "Newtonsoft.Json 12.0.3 age=${age_days}d; minAgeDays threshold=${age_lock_days}d"
+          AGE_LOCK_DAYS="$age_lock_days" envsubst '$AGE_LOCK_DAYS' \
+            < tests/Heimdall.SmokeTests/config.smoke.yml \
+            > /tmp/heimdall.smoke.yml
+          grep -E 'name:|days:' /tmp/heimdall.smoke.yml
+
+      # Mount the rendered smoke config (with the computed age threshold) over the
+      # production config.yml for the duration of the smoke run so the filter rules
+      # can be exercised against real api.nuget.org metadata.
+      - name: Start Heimdall under test
+        run: |
+          docker run -d --name heimdall-smoke -p 8080:8080 \
+            -v /tmp/heimdall.smoke.yml:/app/config.yml:ro \
+            heimdall:smoke
+          echo "container started: $(docker ps --filter name=heimdall-smoke --format '{{.ID}}')"
+
+      # /healthz only checks the process is alive; /readyz hits every configured upstream
+      # (UpstreamReadinessCheck does GET against api.nuget.org with a 5s per-feed budget).
+      # On a cold runner that can comfortably exceed 60s; budget 120s with 3s polls.
+      - name: Wait for /readyz
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 120 ))
+          while true; do
+            if curl --fail --silent --show-error --max-time 5 http://localhost:8080/readyz > /dev/null; then
+              echo "Heimdall reports ready."
+              break
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Heimdall did not become ready within 120s"
+              echo "--- /readyz body ---"
+              curl --silent --max-time 5 http://localhost:8080/readyz || true
+              echo "--- docker logs ---"
+              docker logs heimdall-smoke || true
+              exit 1
+            fi
+            sleep 3
+          done
+
+      - name: Run smoke tests against the running container
+        env:
+          HEIMDALL_SMOKE_BASEURL: http://localhost:8080
+        run: |
+          dotnet test tests/Heimdall.SmokeTests/Heimdall.SmokeTests.csproj \
+            --configuration Release \
+            --logger "console;verbosity=normal"
+
+      # Higher-fidelity smoke: a real `dotnet restore` of a sample consumer project
+      # whose NuGet.config points exclusively at Heimdall. `--packages` writes to a
+      # temp directory so the runner's global cache cannot mask a broken proxy.
+      - name: Restore sample consumer via Heimdall
+        run: |
+          dotnet restore samples/nuget-consumer/Consumer.csproj \
+            --configfile samples/nuget-consumer/NuGet.config \
+            --packages /tmp/heimdall-smoke-packages
+          test -f /tmp/heimdall-smoke-packages/newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg
+
+      - name: Dump container logs (smoke diagnostics)
+        if: always()
+        run: docker logs heimdall-smoke || true
+
+      - name: Stop Heimdall under test
+        if: always()
+        run: docker rm -f heimdall-smoke || true
+
+      - name: Tag & push image to GHCR (only after smoke passes)
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          docker tag heimdall:smoke "ghcr.io/markeli/heimdall:${VERSION}"
+          docker tag heimdall:smoke ghcr.io/markeli/heimdall:latest
+          docker push "ghcr.io/markeli/heimdall:${VERSION}"
+          docker push ghcr.io/markeli/heimdall:latest
 
       - name: Extract release notes from CHANGELOG
         env:

@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Smoke test suite (`tests/Heimdall.SmokeTests/`) that drives a running Heimdall
+  container against the real `api.nuget.org` upstream. Read-path coverage:
+  service index URL rewrite, flat-container versions list, registration,
+  search, `.nupkg` GET and HEAD, and an unknown-feed 404. Filter-rule coverage
+  (via `tests/Heimdall.SmokeTests/config.smoke.yml`, bind-mounted into the
+  container in release CI): `allowDeny` allow-pattern admits matching packages
+  and blocks non-matching ones in both listing and download; `allowDeny`
+  deny-pattern blocks matching packages and lets non-matching through; an
+  `age-locked` feed whose `minAgeDays` is computed at smoke-run time as
+  `(now − Newtonsoft.Json 12.0.3 published date) + 1 day` (anchor:
+  2019-11-09) and injected via `envsubst`, so the rule always rejects the
+  anchor version in both listing and download — no magic numbers, no
+  time-dependent drift. Deliberately kept out of `Heimdall.sln` so
+  `dotnet cake --target=Test` does not pull it in.
+- `samples/nuget-consumer/`: a minimal project whose `NuGet.config` points
+  exclusively at Heimdall, used by release CI to validate that `dotnet restore`
+  works end-to-end through the proxy.
+- Release workflow now builds the image locally, smoke-tests it against the
+  running container (`/readyz` poll up to 120 s, smoke suite, sample restore),
+  and only pushes to GHCR after smoke passes — preventing a half-released state
+  where `:latest` lands ahead of a red smoke run.
+- npm smoke coverage is intentionally deferred: Heimdall does not yet implement
+  an npm ecosystem, so there is nothing to smoke. It will follow once npm is
+  added.
 - CI/CD pipeline on GitHub Actions: `ci` workflow (build + test + changelog guard)
   and `release` workflow (tag-triggered SemVer release, GHCR image push, release
   notes extracted from this file).

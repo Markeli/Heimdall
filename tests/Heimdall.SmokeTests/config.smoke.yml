@@ -1,0 +1,61 @@
+heimdall:
+  server:
+    listen: "http://0.0.0.0:8080"
+    publicBaseUrl: "http://localhost:8080"
+  cache:
+    l1:
+      defaultTtl: "00:01:00"
+    l2:
+      provider: "none"
+  ecosystems:
+    nuget:
+      feeds:
+        # Baseline feed used by the read-path smoke tests. minAgeDays=1 lets every
+        # widely-used package through but still proves the rule is wired up.
+        - name: relaxed
+          upstream: "https://api.nuget.org/v3/index.json"
+          cacheTtl: "00:01:00"
+          rules:
+            - type: minAgeDays
+              days: "1"
+
+        # Allow-list feed: only packages whose id matches Newtonsoft.* may flow.
+        # Smoke tests assert Dapper (a real, well-aged package) is blocked here.
+        - name: allow-newtonsoft
+          upstream: "https://api.nuget.org/v3/index.json"
+          cacheTtl: "00:01:00"
+          rules:
+            - type: allowDeny
+              patterns: "Newtonsoft.*"
+
+        # Deny-pattern feed: explicit '!Newtonsoft.*' rejects Newtonsoft, lets others through.
+        # Exercises AllowDenyRule's deny-first / no-allow-list-is-allow-by-default branch.
+        - name: deny-newtonsoft
+          upstream: "https://api.nuget.org/v3/index.json"
+          cacheTtl: "00:01:00"
+          rules:
+            - type: allowDeny
+              patterns: "!Newtonsoft.*"
+
+        # Age-locked feed: the threshold is computed at smoke-run time as
+        # (now - Newtonsoft.Json 12.0.3's published date) + 1 day, so the rule
+        # always blocks that specific version (and every younger one), grounded
+        # in a real publication anchor rather than a magic number.
+        - name: age-locked
+          upstream: "https://api.nuget.org/v3/index.json"
+          cacheTtl: "00:01:00"
+          rules:
+            - type: minAgeDays
+              days: "${AGE_LOCK_DAYS}"
+  observability:
+    metrics:
+      path: "/metrics"
+    audit:
+      enabled: true
+
+Serilog:
+  MinimumLevel:
+    Default: "Information"
+    Override:
+      "Microsoft": "Warning"
+      "Heimdall.Audit": "Information"
