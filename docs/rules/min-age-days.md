@@ -13,14 +13,41 @@ ecosystem before your internal builds can pull it.
 ```yaml
 - type: minAgeDays
   days: "14"
+  exclude: "Mindbox.*;Quoka;Abc"
 ```
 
 | Field | Type | Notes |
 |---|---|---|
 | `days` | integer (≥ 0) | Minimum required age in whole days. Strings are accepted because YAML scalars from the configuration provider are weakly typed. |
+| `exclude` | string (optional) | `;`- or newline-separated list of glob patterns matched case-insensitively against the package ID. Matching packages bypass the age check (and the missing-`published`-date safeguard). Blank entries are ignored. Omit the field for no exclusions. |
 
 `days: "0"` is legal — it disables the rule but keeps the slot, useful for
 keeping config shapes stable between environments.
+
+### `exclude` — bypassing the age check
+
+`exclude` lists package IDs (with `*` / `?` glob wildcards, case-insensitive)
+that are trusted to skip the age requirement. Use it for first-party
+packages whose publishing pipeline you already control, or for vetted
+third-party IDs where the freshness check is not meaningful. The pattern
+syntax matches the `allowDeny` rule — `Mindbox.*` matches every package
+whose ID starts with `Mindbox.`; bare names like `Quoka` are exact matches.
+
+A multi-line form is equivalent and is often easier to read in YAML:
+
+```yaml
+- type: minAgeDays
+  days: "14"
+  exclude: |
+    Mindbox.*
+    Quoka
+    Abc
+```
+
+Note that an excluded match short-circuits the rule before the
+`published`-is-null safeguard runs — Heimdall trusts the exclusion list and
+will allow a matching package even if its catalog entry has no `published`
+timestamp.
 
 ## Semantics
 
@@ -83,3 +110,6 @@ When `published` is missing:
   `published` timestamp is the only signal.
 - It does **not** care about SemVer ordering — a freshly-published `1.0.0`
   is treated identically to a freshly-published `2.0.0`.
+- `exclude` does **not** combine with the `allowDeny` rule — they are
+  independent stages of the filter pipeline. To deny a package outright,
+  add an `allowDeny` rule alongside `minAgeDays`.
