@@ -8,6 +8,7 @@ RUN dotnet tool restore
 # Copy everything Cake needs to call the same Publish target the developer runs locally.
 COPY global.json NuGet.config Directory.Build.props Directory.Packages.props build.cake Heimdall.sln ./
 COPY src/ src/
+COPY tests/ tests/
 
 RUN dotnet cake --target=Publish --output=/app --configuration=Release
 
