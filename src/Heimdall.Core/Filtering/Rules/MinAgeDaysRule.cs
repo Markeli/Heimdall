@@ -21,7 +21,6 @@ public sealed class MinAgeDaysRule : IRule
 
 	private readonly int _days;
 	private readonly List<Regex> _exclude;
-	private readonly List<string> _excludeSources;
 
 	/// <summary>
 	/// Creates a new <see cref="MinAgeDaysRule"/>.
@@ -38,7 +37,6 @@ public sealed class MinAgeDaysRule : IRule
 		_days = days;
 
 		var exclude = new List<Regex>();
-		var excludeSrc = new List<string>();
 		if (excludePatterns is not null)
 		{
 			foreach (var raw in excludePatterns)
@@ -48,14 +46,11 @@ public sealed class MinAgeDaysRule : IRule
 					continue;
 				}
 
-				var trimmed = raw.Trim();
-				exclude.Add(GlobMatcher.Compile(trimmed));
-				excludeSrc.Add(trimmed);
+				exclude.Add(GlobMatcher.Compile(raw.Trim()));
 			}
 		}
 
 		_exclude = exclude;
-		_excludeSources = excludeSrc;
 	}
 
 	/// <inheritdoc />
