@@ -5,7 +5,9 @@ namespace Heimdall.Core.Filtering.Rules;
 
 /// <summary>
 /// Builder for <see cref="MinAgeDaysRule"/>. Reads the required <c>days</c> parameter and
-/// parses it as a non-negative invariant-culture integer.
+/// parses it as a non-negative invariant-culture integer. Optionally reads <c>exclude</c>:
+/// a <c>;</c>- or newline-separated list of glob patterns whose matching package IDs bypass
+/// the age check.
 /// </summary>
 public sealed class MinAgeDaysRuleBuilder : IRuleBuilder
 {
@@ -34,6 +36,14 @@ public sealed class MinAgeDaysRuleBuilder : IRuleBuilder
 			throw new ArgumentException($"minAgeDays 'days' must be >= 0, got {days}", nameof(config));
 		}
 
-		return new MinAgeDaysRule(days);
+		string[]? exclude = null;
+		if (config.Parameters.TryGetValue("exclude", out var rawExclude) && rawExclude is not null)
+		{
+			exclude = rawExclude.Split(
+				[';', '\n'],
+				StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+		}
+
+		return new MinAgeDaysRule(days, exclude);
 	}
 }

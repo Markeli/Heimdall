@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `minAgeDays` rule now accepts an optional `exclude` parameter — a `;`- or
+  newline-separated list of glob patterns matched case-insensitively against
+  the package ID. Matching packages bypass the age check (and the
+  missing-`published`-date safeguard), letting operators carve out
+  first-party namespaces such as `Mindbox.*` or pre-vetted IDs like `Quoka`
+  without standing up a separate feed. Closes #2.
 - Smoke test suite (`tests/Heimdall.SmokeTests/`) that drives a running Heimdall
   container against the real `api.nuget.org` upstream. Read-path coverage:
   service index URL rewrite, flat-container versions list, registration,
