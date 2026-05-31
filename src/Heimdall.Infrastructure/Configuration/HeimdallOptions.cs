@@ -61,6 +61,13 @@ public sealed class SearchOptions
 	/// Constrained to <c>1..100</c> by <see cref="HeimdallOptionsValidator"/>.
 	/// </summary>
 	public int DefaultTake { get; set; } = 20;
+
+	/// <summary>
+	/// Maximum number of registration documents fetched concurrently when enriching a single search
+	/// response page with publish dates. Bounds the upstream/thread-pool fan-out per request so search
+	/// stays scalable under load. Must be <c>&gt;= 1</c> (validated by <see cref="HeimdallOptionsValidator"/>).
+	/// </summary>
+	public int MaxConcurrentRegistrationFetches { get; set; } = 8;
 }
 
 /// <summary>Container for L1 and L2 cache strand settings.</summary>

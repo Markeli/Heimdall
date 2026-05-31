@@ -2,6 +2,8 @@ heimdall:
   server:
     listen: "http://0.0.0.0:8080"
     publicBaseUrl: "http://localhost:8080"
+    search:
+      maxConcurrentRegistrationFetches: 8
   cache:
     l1:
       defaultTtl: "00:05:00"

@@ -35,8 +35,8 @@
 		{
 			"id": "filter-latest-versions",
 			"name": "Filter latest versions",
-			"description": "Filtering rule targeting the most-recent version(s) of a package — see issue #19 for the exact semantics to design.",
-			"status": "planned",
+			"description": "When metadata is served (search + specific package), show only versions that pass the feed filters and recompute the displayed latest by semver (stable-preferred). Enrich search hits with registration publish dates so date-based rules apply consistently; specific package with all versions filtered returns 404.",
+			"status": "in_progress",
 			"issue": 19,
 			"dependencies": ["rule-min-age-days", "rule-allow-deny"],
 			"doneCriteria": "Rule type implemented with unit + integration tests; README/docs updated; CHANGELOG entry; Closes #19.",

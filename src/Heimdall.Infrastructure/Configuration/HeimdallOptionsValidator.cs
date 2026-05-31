@@ -50,6 +50,12 @@ public sealed class HeimdallOptionsValidator : IValidateOptions<HeimdallOptions>
 			errors.Add($"heimdall.server.search.defaultTake must be in 1..100, got {options.Server.Search.DefaultTake}");
 		}
 
+		if (options.Server.Search.MaxConcurrentRegistrationFetches < 1)
+		{
+			errors.Add("heimdall.server.search.maxConcurrentRegistrationFetches must be >= 1, got "
+				+ options.Server.Search.MaxConcurrentRegistrationFetches);
+		}
+
 		var seenFeedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		for (var i = 0; i < options.Ecosystems.NuGet.Feeds.Count; i++)
 		{

@@ -18,6 +18,7 @@ heimdall:
       knownNetworks: []                   # CIDR networks to trust
     search:
       defaultTake: 20                     # default page size for /query
+      maxConcurrentRegistrationFetches: 8 # cap on parallel registration fetches per search page
 ```
 
 ## Keys
@@ -67,3 +68,13 @@ blindly trusting forwarded values.
 
 Default page size for the `query` endpoint when the client omits or passes a
 non-positive `take`. Constrained to `1..100` by the validator. Default `20`.
+
+### `search.maxConcurrentRegistrationFetches`
+
+NuGet search results carry no per-version publish dates, so to apply date-based
+rules (such as `minAgeDays`) consistently Heimdall enriches each search hit with
+the publish dates from that package's registration index. Those registration
+documents are fetched concurrently and served from the same cache as the
+metadata endpoints; this key bounds how many run in parallel for a single search
+page, keeping the upstream and thread-pool fan-out in check under load. Must be
+`>= 1`. Default `8`.
