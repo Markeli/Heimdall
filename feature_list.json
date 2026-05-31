@@ -1,0 +1,106 @@
+{
+	"$comment": "Coarse feature tracker for AI agents. GitHub issues remain the source of truth for fine-grained work; this file is the at-a-glance map an agent reads on startup. Keep statuses honest: done | in_progress | planned | out_of_scope. Exactly one feature should be in_progress at a time (see AGENTS.md 'Scope').",
+	"activeFeatureId": null,
+	"features": [
+		{
+			"id": "nuget-proxy",
+			"name": "NuGet V3 proxy (MVP)",
+			"description": "Stream package files through and cache metadata in memory for service index, flatcontainer listing, registration, search, and .nupkg GET/HEAD with @id URL rewrite.",
+			"status": "done",
+			"issue": null,
+			"dependencies": [],
+			"doneCriteria": "All NuGet V3 endpoints in README served; integration tests green via dotnet cake --target=Test.",
+			"evidence": "tests/Heimdall.IntegrationTests + tests/Heimdall.SmokeTests against api.nuget.org pass in release CI."
+		},
+		{
+			"id": "rule-min-age-days",
+			"name": "minAgeDays filter rule (+ exclude)",
+			"description": "Reject versions younger than N days; null published date is denied. Optional exclude globs bypass the age check for first-party namespaces.",
+			"status": "done",
+			"issue": 2,
+			"dependencies": ["nuget-proxy"],
+			"doneCriteria": "Rule applied in listing and download paths; exclude documented in README; unit tests cover allow/deny/exclude.",
+			"evidence": "CHANGELOG [Unreleased] 'minAgeDays exclude' entry, Closes #2; smoke 'age-locked' feed rejects the anchor version."
+		},
+		{
+			"id": "rule-allow-deny",
+			"name": "allowDeny filter rule",
+			"description": "Case-insensitive glob allow/deny by package ID; deny wins; allow-list gates non-matching packages.",
+			"status": "done",
+			"issue": null,
+			"dependencies": ["nuget-proxy"],
+			"doneCriteria": "Listing and download honour allow/deny semantics described in README.",
+			"evidence": "Smoke coverage: allow admits matching/blocks non-matching; deny blocks matching/passes non-matching."
+		},
+		{
+			"id": "filter-latest-versions",
+			"name": "Filter latest versions",
+			"description": "Filtering rule targeting the most-recent version(s) of a package — see issue #19 for the exact semantics to design.",
+			"status": "planned",
+			"issue": 19,
+			"dependencies": ["rule-min-age-days", "rule-allow-deny"],
+			"doneCriteria": "Rule type implemented with unit + integration tests; README/docs updated; CHANGELOG entry; Closes #19.",
+			"evidence": null
+		},
+		{
+			"id": "ecosystem-npm",
+			"name": "npm registry proxy",
+			"description": "Second ecosystem after NuGet. Mirror the filtering-rule contract over the npm registry API.",
+			"status": "planned",
+			"issue": 11,
+			"dependencies": ["nuget-proxy"],
+			"doneCriteria": "npm read-path endpoints proxied with filtering; npm smoke coverage added (currently deferred per CHANGELOG); Closes #11.",
+			"evidence": null
+		},
+		{
+			"id": "ecosystem-pypi",
+			"name": "PyPI proxy",
+			"description": "PyPI ecosystem support behind the same rule engine.",
+			"status": "planned",
+			"issue": 12,
+			"dependencies": ["ecosystem-npm"],
+			"doneCriteria": "PyPI read-path proxied with filtering and tests; Closes #12.",
+			"evidence": null
+		},
+		{
+			"id": "ecosystem-go",
+			"name": "Go modules proxy",
+			"description": "Go module proxy ecosystem support.",
+			"status": "planned",
+			"issue": 13,
+			"dependencies": ["ecosystem-npm"],
+			"doneCriteria": "Go module read-path proxied with filtering and tests; Closes #13.",
+			"evidence": null
+		},
+		{
+			"id": "ecosystem-maven",
+			"name": "Maven Central proxy",
+			"description": "Maven Central ecosystem support.",
+			"status": "planned",
+			"issue": 14,
+			"dependencies": ["ecosystem-npm"],
+			"doneCriteria": "Maven read-path proxied with filtering and tests; Closes #14.",
+			"evidence": null
+		},
+		{
+			"id": "docs-improvement",
+			"name": "Documentation improvements",
+			"description": "Improve the Docusaurus docs under docs/ (source) — config, rules, API, operations, architecture.",
+			"status": "planned",
+			"issue": 10,
+			"dependencies": [],
+			"doneCriteria": "Edits land in docs/ (not website/docs/); npm run build passes in website/ (onBrokenLinks: throw); Closes #10.",
+			"evidence": null
+		},
+		{
+			"id": "l2-redis-cache",
+			"name": "L2 Redis cache",
+			"description": "Out of scope for MVP. Contract is in place and registered through DI, but no implementation.",
+			"status": "out_of_scope",
+			"issue": null,
+			"dependencies": ["nuget-proxy"],
+			"doneCriteria": "n/a — MVP explicitly excludes this (README 'Out of scope').",
+			"evidence": null
+		}
+	]
+}

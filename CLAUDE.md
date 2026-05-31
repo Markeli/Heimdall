@@ -1,7 +1,10 @@
 # Claude Code guide
 
 Claude Code follows the same rules as every other AI agent working on this
-repo. The binding contract is in [`AGENTS.md`](AGENTS.md); read it first.
+repo. The binding contract is in [`AGENTS.md`](AGENTS.md); read it first —
+including its **Startup Workflow**, which routes you through `progress.md`,
+`session-handoff.md`, and `feature_list.json`, and its single verify gate
+`./init.sh`.
 
 ## Claude Code-specific notes
 
@@ -19,8 +22,8 @@ repo. The binding contract is in [`AGENTS.md`](AGENTS.md); read it first.
   [`.editorconfig`](.editorconfig).
 - **Style on the docs side**: tabs in YAML / JS / JSON to match the rest
   of the repo; markdown is freeform.
-- **Always run `dotnet cake --target=Test --configuration=Release`
-  locally** before pushing — `CONTRIBUTING.md §3` requires it and CI will
-  fail the PR otherwise.
+- **Always run `./init.sh` locally before pushing** — it wraps
+  `dotnet cake --target=Test --configuration=Release` (the exact pipeline
+  `CONTRIBUTING.md §3` requires), and CI will fail the PR otherwise.
 
 If `AGENTS.md` and this file disagree, `AGENTS.md` wins.
