@@ -1,7 +1,12 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Packages;
 using Heimdall.Ecosystems.NuGet.V3.Models;
+using Heimdall.Infrastructure.Configuration;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Heimdall.Ecosystems.NuGet.V3;
 
@@ -19,6 +24,8 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 	private readonly HybridCache _cache;
 	private readonly NuGetV3MetadataTransformer _transformer;
 	private readonly NuGetV3UrlRewriter _urls;
+	private readonly IOptionsMonitor<HeimdallOptions> _options;
+	private readonly ILogger<NuGetV3MetadataService> _logger;
 
 	/// <summary>
 	/// Creates a new <see cref="NuGetV3MetadataService"/>.
@@ -29,6 +36,8 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 	/// <param name="cache">Hybrid (L1 + optional L2) cache for registration documents. Provides stampede protection.</param>
 	/// <param name="transformer">Filter-and-rewrite transformer.</param>
 	/// <param name="urls">Heimdall-facing URL rewriter.</param>
+	/// <param name="options">Live options monitor used to read the search enrichment concurrency cap.</param>
+	/// <param name="logger">Logger used to surface registration-enrichment failures during search.</param>
 	/// <exception cref="ArgumentNullException">Thrown when any dependency is null.</exception>
 	public NuGetV3MetadataService(
 		IFeedConfigLookup lookup,
@@ -36,7 +45,9 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 		INuGetV3UpstreamClient upstream,
 		HybridCache cache,
 		NuGetV3MetadataTransformer transformer,
-		NuGetV3UrlRewriter urls)
+		NuGetV3UrlRewriter urls,
+		IOptionsMonitor<HeimdallOptions> options,
+		ILogger<NuGetV3MetadataService> logger)
 	{
 		ArgumentNullException.ThrowIfNull(lookup);
 		ArgumentNullException.ThrowIfNull(snapshots);
@@ -44,6 +55,8 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 		ArgumentNullException.ThrowIfNull(cache);
 		ArgumentNullException.ThrowIfNull(transformer);
 		ArgumentNullException.ThrowIfNull(urls);
+		ArgumentNullException.ThrowIfNull(options);
+		ArgumentNullException.ThrowIfNull(logger);
 
 		_lookup = lookup;
 		_snapshots = snapshots;
@@ -51,6 +64,8 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 		_cache = cache;
 		_transformer = transformer;
 		_urls = urls;
+		_options = options;
+		_logger = logger;
 	}
 
 	/// <inheritdoc />
@@ -129,7 +144,61 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 			return null;
 		}
 
-		return _transformer.RewriteSearch(result, feed);
+		// Search hits carry no publish dates, so date-based rules (e.g. minAgeDays) cannot be applied
+		// to them directly. Enrich each hit with the registration metadata Heimdall already caches so
+		// search filters consistently with the specific-package endpoints.
+		var enriched = await EnrichSearchHitsAsync(feedName, result, ct);
+		return _transformer.RewriteSearch(result, feed, enriched);
+	}
+
+	private async Task<IReadOnlyDictionary<string, IReadOnlyList<PackageVersionMetadata>>> EnrichSearchHitsAsync(
+		string feedName, SearchResultV3 result, CancellationToken ct)
+	{
+		var packageIds = result.Data
+			.Select(hit => hit.PackageId)
+			.Where(id => !string.IsNullOrEmpty(id))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToList();
+
+		var enriched = new ConcurrentDictionary<string, IReadOnlyList<PackageVersionMetadata>>(
+			StringComparer.OrdinalIgnoreCase);
+		if (packageIds.Count == 0)
+		{
+			return enriched;
+		}
+
+		// Bound the fan-out: a search page must not spawn one unbounded registration fetch per hit.
+		// The cap is configurable so it can be tuned to the deployment's upstream/thread-pool budget.
+		var parallelOptions = new ParallelOptions
+		{
+			MaxDegreeOfParallelism = Math.Max(1, _options.CurrentValue.Server.Search.MaxConcurrentRegistrationFetches),
+			CancellationToken = ct,
+		};
+
+		await Parallel.ForEachAsync(packageIds, parallelOptions, async (packageId, token) =>
+		{
+			try
+			{
+				var registration = await GetRegistrationFromCacheOrUpstreamAsync(feedName, packageId, token);
+				if (registration is not null)
+				{
+					enriched[packageId] = NuGetV3MetadataProjection.ToVersionMetadata(registration);
+				}
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				// On failure the transformer falls back to date-less hit metadata, which drops the hit
+				// under date-based rules. Log so the silent omission is observable rather than mysterious.
+				_logger.LogWarning(
+					ex,
+					"Failed to enrich search hit {PackageId} on feed {Feed} from registration; "
+						+ "it will be filtered using date-less metadata",
+					packageId,
+					feedName);
+			}
+		});
+
+		return enriched;
 	}
 
 	/// <inheritdoc />

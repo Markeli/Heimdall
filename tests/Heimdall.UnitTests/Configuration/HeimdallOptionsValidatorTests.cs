@@ -113,6 +113,19 @@ public class HeimdallOptionsValidatorTests
 		result.FailureMessage.Should().Contain("defaultTake");
 	}
 
+	[Theory]
+	[InlineData(0)]
+	[InlineData(-1)]
+	public void Search_max_concurrent_registration_fetches_below_one_fails(int value)
+	{
+		var validator = new HeimdallOptionsValidator();
+		var opts = Valid();
+		opts.Server.Search.MaxConcurrentRegistrationFetches = value;
+		var result = validator.Validate(null, opts);
+		result.Failed.Should().BeTrue();
+		result.FailureMessage.Should().Contain("maxConcurrentRegistrationFetches");
+	}
+
 	[Fact]
 	public void Forwarded_known_proxy_must_parse_as_ip()
 	{

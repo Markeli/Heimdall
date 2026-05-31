@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Search responses are now filtered consistently with the specific-package
+  endpoints. Search hits carry no publish dates, so date-based rules (e.g.
+  `minAgeDays`) previously denied every version in search; Heimdall now enriches
+  each hit with the publish dates from the cached registration index before
+  filtering. The per-page registration fan-out is bounded by the new
+  `heimdall.server.search.maxConcurrentRegistrationFetches` setting (default
+  `8`, must be `>= 1`). Closes #19.
 - `minAgeDays` rule now accepts an optional `exclude` parameter — a `;`- or
   newline-separated list of glob patterns matched case-insensitively against
   the package ID. Matching packages bypass the age check (and the
@@ -50,6 +57,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installation, configuration, filtering rules, API, operations, and
   architecture.
 - `CLAUDE.md` at the repository root pointing Claude Code users at `AGENTS.md`.
+
+### Changed
+- The displayed "latest" version is now recomputed over the surviving (filtered)
+  set rather than taken from the upstream's pick: the search hit's primary
+  `version` is the highest stable survivor (falling back to the highest
+  prerelease), and the flat-container versions list and registration
+  `lower`/`upper` are ordered by semantic version instead of lexicographically
+  (so `2.0.0` sorts before `10.0.0`). Requesting a specific package whose every
+  version is filtered out now returns `404` instead of an empty document.
 
 ### Security
 - Pin `serialize-javascript` to `^7.0.5` in `website/` via an npm `overrides`

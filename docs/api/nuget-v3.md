@@ -62,16 +62,20 @@ shape matches NuGet's flat container exactly:
 }
 ```
 
-The id is case-insensitive. When the feed is unknown the response is `404
-ProblemDetails`; when the package is unknown upstream, `404` with an empty
-body.
+Versions are ordered ascending by **semantic version** (so `2.0.0` precedes
+`10.0.0`, not lexicographically). The id is case-insensitive. When the feed is
+unknown the response is `404 ProblemDetails`; when the package is unknown
+upstream **or every version is filtered out**, `404` — Heimdall does not expose
+a package that has no servable versions.
 
 ## Registration — `GET /nuget/{feed}/v3/registration5-gz-semver2/{id}/index.json`
 
 Returns the registration index document, again with `@id` URLs rewritten and
-denied versions pruned. The current implementation collapses page bounds, so
-`/page/{lower}/{upper}.json` is also routed but ignores its bounds —
-acceptable because Heimdall inlines the full registration.
+denied versions pruned. Surviving leaves are ordered by semantic version and the
+page `lower`/`upper` bounds are the true min/max of the surviving set. The
+current implementation collapses page bounds, so `/page/{lower}/{upper}.json` is
+also routed but ignores its bounds — acceptable because Heimdall inlines the
+full registration. When every version is filtered out the response is `404`.
 
 ## Search — `GET /nuget/{feed}/v3/query`
 
@@ -85,7 +89,18 @@ Standard NuGet search. Query parameters:
 | `prerelease` | bool | When `true`, include prerelease versions. |
 
 The response is the upstream search response with rejected versions filtered
-out and `@id` URLs rewritten.
+out and `@id` URLs rewritten. Each hit's surviving versions are ordered by
+semantic version, and the hit's primary `version` is recomputed as the latest
+survivor — the highest stable version, or the highest prerelease when no stable
+version survives. A hit whose every version is filtered out is dropped from the
+results.
+
+Because NuGet search hits carry no per-version publish dates, Heimdall enriches
+each hit with the dates from that package's registration index before filtering,
+so date-based rules (e.g. `minAgeDays`) apply to search exactly as they do to
+the versions list and registration endpoints. The parallelism of that
+enrichment is bounded by
+[`search.maxConcurrentRegistrationFetches`](../configuration/server.md).
 
 ```sh
 curl -fsSL 'http://localhost:8080/nuget/strict/v3/query?q=Newtonsoft.Json&take=3'

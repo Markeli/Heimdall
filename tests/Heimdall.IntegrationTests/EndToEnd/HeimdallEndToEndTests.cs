@@ -60,7 +60,8 @@ public class HeimdallEndToEndTests : IDisposable
 				  "version": "3.0.0",
 				  "resources": [
 					{ "@id": "{{_upstream.Url}}/v3/registrations/", "@type": "RegistrationsBaseUrl/3.6.0" },
-					{ "@id": "{{_upstream.Url}}/v3/flatcontainer/", "@type": "PackageBaseAddress/3.0.0" }
+					{ "@id": "{{_upstream.Url}}/v3/flatcontainer/", "@type": "PackageBaseAddress/3.0.0" },
+					{ "@id": "{{_upstream.Url}}/v3/query", "@type": "SearchQueryService" }
 				  ]
 				}
 				"""));
@@ -95,6 +96,57 @@ public class HeimdallEndToEndTests : IDisposable
 						  },
 						  "packageContent": "{{_upstream.Url}}/v3/flatcontainer/foo.bar/2.0.0/foo.bar.2.0.0.nupkg"
 						}
+					  ]
+					}
+				  ]
+				}
+				"""));
+
+		// A package whose every version is younger than the feed's minAgeDays threshold.
+		_upstream.Given(Request.Create().WithPath("/v3/registrations/all.new/index.json").UsingGet())
+			.RespondWith(Response.Create()
+				.WithStatusCode(200)
+				.WithHeader("Content-Type", "application/json")
+				.WithBody($$"""
+				{
+				  "@id": "{{_upstream.Url}}/v3/registrations/all.new/index.json",
+				  "count": 1,
+				  "items": [
+					{
+					  "count": 1,
+					  "items": [
+						{
+						  "catalogEntry": {
+							"id": "All.New",
+							"version": "1.0.0",
+							"published": "2026-05-05T00:00:00+00:00",
+							"listed": true
+						  },
+						  "packageContent": "{{_upstream.Url}}/v3/flatcontainer/all.new/1.0.0/all.new.1.0.0.nupkg"
+						}
+					  ]
+					}
+				  ]
+				}
+				"""));
+
+		// Search hit for Foo.Bar listing both versions; the proxy enriches dates from the registration
+		// above and filters 2.0.0 (too new) out, leaving 1.0.0 as the recomputed primary.
+		_upstream.Given(Request.Create().WithPath("/v3/query").UsingGet())
+			.RespondWith(Response.Create()
+				.WithStatusCode(200)
+				.WithHeader("Content-Type", "application/json")
+				.WithBody($$"""
+				{
+				  "totalHits": 1,
+				  "data": [
+					{
+					  "@id": "{{_upstream.Url}}/v3/registrations/foo.bar/index.json",
+					  "id": "Foo.Bar",
+					  "version": "2.0.0",
+					  "versions": [
+						{ "version": "1.0.0", "downloads": 100 },
+						{ "version": "2.0.0", "downloads": 5 }
 					  ]
 					}
 				  ]
@@ -201,6 +253,47 @@ public class HeimdallEndToEndTests : IDisposable
 		resp.StatusCode.Should().Be(HttpStatusCode.OK);
 		var bytes = await resp.Content.ReadAsByteArrayAsync();
 		bytes.Should().BeEquivalentTo(new byte[] { 0x50, 0x4B, 0x03, 0x04, 0xAA, 0xBB, 0xCC, 0xDD });
+	}
+
+	[Fact]
+	public async Task Search_filters_versions_and_recomputes_primary()
+	{
+		using var factory = CreateFactory();
+		using var client = factory.CreateClient();
+
+		var resp = await client.GetAsync("/nuget/strict/v3/query?q=foo");
+		resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+		var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>();
+		var hit = doc!.RootElement.GetProperty("data").EnumerateArray().Single();
+
+		// 2.0.0 is younger than 14 days (enriched from registration) and is filtered out; the primary
+		// version drops to the surviving 1.0.0.
+		hit.GetProperty("version").GetString().Should().Be("1.0.0");
+		var versions = hit.GetProperty("versions").EnumerateArray()
+			.Select(v => v.GetProperty("version").GetString()).ToList();
+		versions.Should().BeEquivalentTo(["1.0.0"]);
+	}
+
+	[Fact]
+	public async Task Versions_list_returns_404_when_all_versions_filtered()
+	{
+		using var factory = CreateFactory();
+		using var client = factory.CreateClient();
+
+		var resp = await client.GetAsync("/nuget/strict/v3/flatcontainer/all.new/index.json");
+		resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+	}
+
+	[Fact]
+	public async Task Registration_returns_404_when_all_versions_filtered()
+	{
+		using var factory = CreateFactory();
+		using var client = factory.CreateClient();
+
+		var resp = await client.GetAsync(
+			"/nuget/strict/v3/registration5-gz-semver2/all.new/index.json");
+		resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
 	}
 
 	[Fact]
