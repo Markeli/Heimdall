@@ -51,6 +51,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   architecture.
 - `CLAUDE.md` at the repository root pointing Claude Code users at `AGENTS.md`.
 
+### Changed
+- Documentation site re-themed: brand accent recoloured from blue to a deep
+  burnt orange, and the logo/favicon switched from a rounded tile to a
+  shield-with-"H" mark. Link text uses a darkened orange for WCAG AA contrast
+  on white. (In the scope of #10.)
+- Documentation reworked (Closes #10). Repositioned Heimdall as a minimalist
+  **dependency firewall** for public package registries (not a NuGet-specific
+  proxy) across the README, docs intro and site tagline. README slimmed to a
+  pointer — dropped the Stack/Layout/Endpoints/Tests/local-path sections (and a
+  leaked absolute path) in favour of links to the docs site. Added a
+  **Supported registries** table (NuGet available; npm/PyPI/Go/Maven planned —
+  #11–#14) with local SVG logos under `website/static/img/registries/`. The
+  Architecture overview now leads with the registry-agnostic processing flow and
+  the core-vs-adapter split. Trimmed the configuration hot-reload/validation and
+  request-logging write-ups to brief mentions, and documented the smoke-test
+  suite under Development.
+
 ### Security
 - Pin `serialize-javascript` to `^7.0.5` in `website/` via an npm `overrides`
   block. The dependency arrives transitively through

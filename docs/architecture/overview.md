@@ -4,134 +4,108 @@ sidebar_position: 1
 
 # Architecture overview
 
-Heimdall is a small ASP.NET Core MVC service split into four projects under
-`src/`. The split exists so each layer is testable in isolation and so a
-future second ecosystem (npm, Maven) plugs in without touching the API
-host.
+Heimdall is built around one **registry-agnostic processing flow**. Everything
+that is the same for every registry — resolving a feed, caching metadata,
+running the filter rules, gating downloads — lives in a shared core; everything
+that is specific to a registry (its wire protocol, URL shapes, metadata model)
+lives behind an ecosystem adapter. Adding npm, PyPI, Go or Maven means writing
+a new adapter, not touching the flow.
 
-## Project layout
+## The universal flow
+
+Every read request, regardless of ecosystem, follows the same five steps:
 
 ```
-src/
-  Heimdall.Core              # models, contracts, filters, rules
-  Heimdall.Infrastructure    # config binding, validation, cache wiring
-  Heimdall.Ecosystems.NuGet  # NuGet v3 specifics
-  Heimdall.Api               # ASP.NET Core host and controllers
-tests/
-  Heimdall.UnitTests
-  Heimdall.IntegrationTests  # WebApplicationFactory + WireMock.Net
+request ──► 1. resolve feed config        IFeedConfigLookup.TryGet(ecosystem, feed)
+            2. fetch upstream metadata     ecosystem adapter → upstream client
+                                           (memoized in HybridCache; key carries
+                                            the config-snapshot generation)
+            3. filter versions             RuleEvaluator over the feed's IRule list
+                                           (VersionListFilter for lists)
+            4. rewrite URLs                @id / download links → publicBaseUrl
+            5. respond                     200 + projected, filtered payload
 ```
 
-### `Heimdall.Core`
+The **download** path adds a gate instead of a list filter: before a single
+`.nupkg`/tarball/etc. is streamed, `SingleVersionGate` re-runs the same rules on
+that one version. This is deliberate — a client must not be able to bypass the
+listing filter by requesting a binary URL directly. On a deny, the binary never
+starts streaming and the client gets `403 ProblemDetails` naming the rule.
 
-Domain types and the filter pipeline:
+```
+download ──► resolve feed ─► SingleVersionGate.Evaluate(version, rules)
+                              ├── Allow → stream upstream body through (no disk)
+                              └── Deny  → 403 ProblemDetails (ruleName + reason)
+```
 
-- `PackageCoordinates` — `(Ecosystem, Id, SemVersion)` tuple. The
-  "coordinates" name is borrowed from Maven so it survives the move beyond
-  NuGet.
-- `PackageVersionMetadata` — coordinates plus the optional publication
-  timestamp plus ecosystem-specific extras.
-- `IRule` / `RuleVerdict` / `RuleEvaluator` — the filter pipeline. See
-  [Filtering pipeline](filtering-pipeline.md) for details.
-- `IConfigSnapshotProvider` / `IFeedConfigLookup` — the contract layer for
-  configuration, implemented in Infrastructure.
+Steps 1, 3 and 5's gating are **ecosystem-independent**; steps 2 and 4 are the
+adapter's job. That split is the whole architecture.
 
-### `Heimdall.Infrastructure`
+## Core vs. adapter
 
-Cross-cutting plumbing:
+### `Heimdall.Core` — the registry-agnostic engine
 
-- Binds `HeimdallOptions` from the `heimdall:` YAML section, with
-  validation via `HeimdallOptionsValidator`.
-- Registers `Microsoft.Extensions.Caching.Hybrid` with an in-memory
-  `IDistributedCache` stub for the L2 strand (see
-  [Caching](caching.md)).
-- Provides `ConfigSnapshotProvider`, the monotonic snapshot service that
-  lets cache keys include a generation token.
-- Provides `FeedConfigLookup`, the per-request lookup used by controllers.
+- `PackageCoordinates` — `(Ecosystem, Id, SemVersion)`. The "coordinates" name
+  is borrowed from Maven so it survives the move beyond NuGet.
+- `PackageVersionMetadata` — coordinates plus the optional publication timestamp
+  plus ecosystem-specific extras.
+- `IRule` / `RuleVerdict` / `RuleEvaluator` — the pure filter pipeline. See
+  [Filtering pipeline](filtering-pipeline.md).
+- `VersionListFilter` / `SingleVersionGate` — the list-filter and single-version
+  gate that wrap the evaluator (steps 3 and the download gate).
+- `IConfigSnapshotProvider` / `IFeedConfigLookup` — the configuration contracts
+  (step 1), implemented in Infrastructure.
 
-### `Heimdall.Ecosystems.NuGet`
+Nothing here knows what NuGet is. A new ecosystem reuses all of it unchanged.
 
-Everything NuGet v3 specific lives behind ecosystem-shaped interfaces:
+### `Heimdall.Ecosystems.NuGet` — a worked adapter
 
-- `INuGetV3UpstreamClient` (Polly-backed HttpClient) — the only place that
-  talks to nuget.org.
-- `NuGetV3MetadataService` — orchestrates upstream fetches, runs filters,
-  rewrites URLs, and memoizes registration documents via `HybridCache`.
-- `NuGetV3MetadataTransformer` — the filter-and-rewrite pass applied to
-  registration documents.
-- `NuGetV3UrlRewriter` — produces Heimdall URLs from `publicBaseUrl` + feed
-  name.
+Everything NuGet v3 specific sits behind ecosystem-shaped interfaces — the
+template a future ecosystem copies:
+
+- `INuGetV3UpstreamClient` (Polly-backed `HttpClient`) — the only code that talks
+  to nuget.org (step 2).
+- `NuGetV3MetadataService` — orchestrates the five steps for NuGet: fetch,
+  cache, filter, rewrite, project.
+- `NuGetV3MetadataTransformer` — the filter-and-rewrite pass over registration
+  documents (steps 3–4).
+- `NuGetV3UrlRewriter` — builds Heimdall URLs from `publicBaseUrl` + feed name.
 - `NuGetV3MetadataProjection` — projects registration documents into the
-  flat-container versions list and the search-result shape.
+  flat-container versions list and the search-result shape (step 5).
 
-### `Heimdall.Api`
+### `Heimdall.Infrastructure` — cross-cutting plumbing
 
-The ASP.NET Core host. Composes the layers via DI extensions
-(`AddHeimdallCore`, `AddHeimdallInfrastructure`, `AddNuGetV3Ecosystem`) and
-exposes three controllers:
+Binds and validates `HeimdallOptions` from the `heimdall:` YAML section,
+registers `HybridCache` (with an in-memory `IDistributedCache` stub for the L2
+strand — see [Caching](caching.md)), and provides `ConfigSnapshotProvider` (the
+monotonic generation token that scopes cache keys) and `FeedConfigLookup`.
 
-- `NuGetV3MetadataController` — service index, versions list, registration,
-  search.
-- `NuGetV3BinaryController` — `.nupkg` download gate (delegates to
-  `NuGetV3BinaryProxyService`).
-- `HealthController` — `/healthz` and `/readyz`.
+### `Heimdall.Api` — the host
 
-Plus `MapMetrics()` (`/metrics`) and `UseSerilogRequestLogging()`.
+Composes the layers via DI extensions (`AddHeimdallCore`,
+`AddHeimdallInfrastructure`, `AddNuGetV3Ecosystem`) and exposes the controllers
+(`NuGetV3MetadataController`, `NuGetV3BinaryController`, `HealthController`),
+`MapMetrics()` (`/metrics`), and per-request logging.
 
-## Request flow
+## Adding a new ecosystem
 
-A typical "give me the versions of package X on feed Y" request:
+The flow already exists; an adapter provides the registry-specific pieces:
 
-```
-client
-  └── GET /nuget/Y/v3/flatcontainer/x/index.json
-       NuGetV3MetadataController.GetVersionsList
-        └── NuGetV3MetadataService
-             ├── IFeedConfigLookup.TryGet("nuget", Y)         ← feed config
-             ├── HybridCache.GetOrCreateAsync(key)            ← L1, then L2 stub
-             │     └── INuGetV3UpstreamClient.FetchRegistration ← only on miss
-             ├── NuGetV3MetadataTransformer.Apply(rules)      ← filter + rewrite
-             └── NuGetV3MetadataProjection.ToVersionsList     ← extract versions
-       returns 200, JSON
-```
+1. A model that maps the registry's metadata onto `PackageVersionMetadata`.
+2. An upstream client (step 2) and a URL rewriter (step 4) for that protocol.
+3. A metadata service that runs the five steps and a projection that emits the
+   registry's native response shapes.
+4. Controllers exposing that registry's endpoints, plus an `Add…Ecosystem` DI
+   extension wired up in `Heimdall.Api`.
 
-The download path is similar but additionally streams the upstream response
-body through `NuGetV3BinaryProxyService` so the binary never lands on disk.
+The rules (`minAgeDays`, `allowDeny`, …) and the cache are inherited for free —
+they operate on `PackageVersionMetadata`, not on any registry's wire format.
 
 ## What is and is not cached
 
-- **Cached** — registration documents (the metadata for a package across
-  all versions). Keyed by `(ecosystem, feed, packageId, configSnapshot)`
-  with a per-feed TTL.
-- **Not cached** — `.nupkg` binaries. They are streamed through; caching
-  binaries is an explicit non-goal for the MVP.
-- **Not cached** — search results (per-query, low reuse).
+- **Cached** — package metadata documents. Keyed by
+  `(ecosystem, feed, packageId, configSnapshot)` with a per-feed TTL.
+- **Not cached** — binaries (streamed through; caching them is a non-goal for
+  the MVP) and search results (per-query, low reuse).
 
 See [Caching](caching.md) for the design rationale.
-
-## DI graph at a glance
-
-```
-HeimdallOptions  ──┐
-                   ├──► HeimdallOptionsValidator
-HybridCache  ──────┤
-ConfigGeneration ──┤
-ConfigSnapshotProv─┤
-FeedConfigLookup ──┤
-                   │
-RuleFactory ───────┤
-RuleEvaluator ─────┤
-VersionListFilter ─┤
-SingleVersionGate ─┘
-   │
-   └──► NuGetV3UpstreamClient (Polly resilience)
-        NuGetV3MetadataTransformer
-        NuGetV3UrlRewriter
-        NuGetV3MetadataProjection
-        NuGetV3MetadataService
-            │
-            └──► Controllers
-                 NuGetV3BinaryProxyService
-                 UpstreamReadinessCheck
-                 AuditLogger
-```

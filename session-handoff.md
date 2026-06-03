@@ -5,43 +5,50 @@ session restarts cold without guessing. Overwrite it each handoff; the durable
 history lives in `progress.md`, `CHANGELOG.md`, and git.
 
 > **Last Updated:** 2026-05-31
-> **Current Objective:** None active — harness just bootstrapped. NuGet MVP is
-> shipped; no feature is `in_progress`.
-> **Recommended Next Step:** Activate one planned feature from
-> `feature_list.json`, then follow the Startup Workflow in `AGENTS.md`.
+> **Current Objective:** `docs-improvement` (issue #10). Docs reworked and
+> verified locally on branch `docs/improve-docs-issue-10`; changes are
+> uncommitted in the working tree.
+> **Recommended Next Step:** PR [#22](https://github.com/Markeli/Heimdall/pull/22)
+> is open (`Closes #10`). Await CI + review; on merge, flip
+> `docs-improvement` → `done` in `feature_list.json` and `activeFeatureId` → null.
 
 ## Active feature
 
-- **Feature id:** _none_ (`activeFeatureId` is `null` in `feature_list.json`)
-- **Issue:** _n/a_
-- **Branch:** _n/a — none started_
+- **Feature id:** `docs-improvement` (`activeFeatureId` in `feature_list.json`)
+- **Issue:** #10 (Docs improvement)
+- **Branch:** `docs/improve-docs-issue-10` (off `origin/main`)
 
 ## Current State
 
-What is true right now: which step of the feature is done, which is not.
-(Empty — no feature in progress.)
+Implementation complete and verified, **not committed**:
+
+- `./init.sh` → green (53 unit + 9 integration; no code changed).
+- `cd website && npm run build` → green (`onBrokenLinks: "throw"`); registry
+  SVG logos resolve under the `/Heimdall/` baseUrl in the built intro page.
 
 ## Blockers
 
-Anything stopping forward progress: failing test, unclear requirement, missing
-access, decision needed from the maintainer. _(none)_
+- Awaiting maintainer go-ahead to commit/push (per "commit only when asked").
+- Logos are simpleicons SVGs (CC0 glyphs) downloaded into
+  `website/static/img/registries/`. If brand-licensing is a concern, swap the
+  table to the no-image fallback (✅/🔜 statuses) — see the plan's open risk.
 
 ## Files
 
-Files touched or in the middle of an edit this session, and why each matters:
-
-- `AGENTS.md`, `feature_list.json`, `progress.md`, `init.sh`,
-  `session-handoff.md` — harness scaffolding added; no application code
-  touched.
+- `README.md` — slimmed to a pointer; new Supported registries table.
+- `docs/intro.md` — universal positioning + registries table (uses
+  `useBaseUrl`); `docs/configuration/overview.md`, `docs/configuration/logging.md`
+  — trimmed sections; `docs/architecture/overview.md` — rewritten around the
+  universal flow; `docs/development/testing.md` — smoke-tests section.
+- `website/docusaurus.config.js` — tagline. `website/static/img/registries/*.svg`
+  — new logo assets.
+- `AGENTS.md`, `CHANGELOG.md`, `feature_list.json`, `progress.md` — harness +
+  changelog updates.
 
 ## Next Session
 
-The single first action to take, concrete enough to start without re-reading
-the whole conversation:
-
-1. Read `AGENTS.md` → "Startup Workflow".
-2. Pick one planned feature in `feature_list.json`, set it `in_progress` and
-   set `activeFeatureId`.
-3. `git fetch origin main && git checkout -b <type>/<slug> origin/main`.
-4. Write the failing test first, then implement.
-5. `./init.sh` must be green before any "done" claim.
+1. Confirm with maintainer, then:
+   `git add -A && git commit` the docs changes on `docs/improve-docs-issue-10`.
+2. Push and open a PR; fill `.github/pull_request_template.md`; body `Closes #10`.
+3. On green CI + review, merge; then set `docs-improvement` → `done` with
+   evidence and `activeFeatureId` → `null`.

@@ -7,7 +7,7 @@ import { themes as prismThemes } from "prism-react-renderer";
 /** @type {import('@docusaurus/types').Config} */
 const config = {
 	title: "Heimdall",
-	tagline: "Internal proxy for public package repositories",
+	tagline: "A minimalist dependency firewall for public package registries",
 	favicon: "img/favicon.svg",
 
 	url: "https://markeli.github.io",

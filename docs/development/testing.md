@@ -59,6 +59,48 @@ dotnet test tests/Heimdall.IntegrationTests
 These are slower (hundreds of ms each) but catch wiring bugs that pure
 logic tests cannot. The full suite still finishes in seconds.
 
+## `Heimdall.SmokeTests`
+
+Black-box checks against a **real, running Heimdall** talking to the **live**
+`api.nuget.org` — the last line of defence that the shipped container actually
+proxies and filters. Unlike the integration suite, there is no WireMock here:
+the assertions hit the network.
+
+The suite is intentionally **kept out of `Heimdall.sln`**, so
+`dotnet cake --target=Test` does *not* run it — it only runs against a real
+container in the `release` pipeline. The tests target the URL in
+`HEIMDALL_SMOKE_BASEURL` (default `http://localhost:8080`) and exercise the
+feeds defined in
+[`tests/Heimdall.SmokeTests/config.smoke.yml`](https://github.com/Markeli/Heimdall/blob/main/tests/Heimdall.SmokeTests/config.smoke.yml):
+
+- `relaxed` (`minAgeDays: 1`) — read-path: service index, listing, registration,
+  download all work end-to-end.
+- `allow-newtonsoft` (`allowDeny: Newtonsoft.*`) — allow-list admits
+  `Newtonsoft.*`, blocks an unrelated well-aged package (Dapper).
+- `deny-newtonsoft` (`allowDeny: !Newtonsoft.*`) — deny-pattern rejects
+  Newtonsoft, lets others through.
+- `age-locked` — `minAgeDays` is computed at run time from a real publication
+  anchor (Newtonsoft.Json 12.0.3) so the rule deterministically blocks that
+  version and every younger one.
+
+**When it runs.** In the `release` workflow only: it builds the image, renders
+the dynamic age threshold into the smoke config, runs the container, executes
+the suite against it, and — as a higher-fidelity check — does a real
+`dotnet restore` of [`samples/nuget-consumer`](https://github.com/Markeli/Heimdall/tree/main/samples/nuget-consumer)
+through Heimdall. The image is pushed to GHCR **only after smoke passes**.
+
+**Run it locally** against a container you started yourself:
+
+```sh
+docker run --rm -p 8080:8080 \
+  -v $(pwd)/tests/Heimdall.SmokeTests/config.smoke.yml:/app/config.yml heimdall:dev
+# in another shell, with the container up:
+dotnet test tests/Heimdall.SmokeTests/Heimdall.SmokeTests.csproj
+```
+
+(The `age-locked` feed uses an `${AGE_LOCK_DAYS}` placeholder the release
+pipeline substitutes; locally either render it or skip that feed's assertions.)
+
 ## Patterns to follow
 
 - **Time** — never read `DateTime.UtcNow` in a rule. Use the `NowUtc`
