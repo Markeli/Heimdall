@@ -1,6 +1,6 @@
 {
 	"$comment": "Coarse feature tracker for AI agents. GitHub issues remain the source of truth for fine-grained work; this file is the at-a-glance map an agent reads on startup. Keep statuses honest: done | in_progress | planned | out_of_scope. Exactly one feature should be in_progress at a time (see AGENTS.md 'Scope').",
-	"activeFeatureId": null,
+	"activeFeatureId": "docs-improvement",
 	"features": [
 		{
 			"id": "nuget-proxy",
@@ -86,7 +86,7 @@
 			"id": "docs-improvement",
 			"name": "Documentation improvements",
 			"description": "Improve the Docusaurus docs under docs/ (source) — config, rules, API, operations, architecture.",
-			"status": "planned",
+			"status": "in_progress",
 			"issue": 10,
 			"dependencies": [],
 			"doneCriteria": "Edits land in docs/ (not website/docs/); npm run build passes in website/ (onBrokenLinks: throw); Closes #10.",

@@ -66,6 +66,9 @@ mid-task resumes), not in chat history. Update them as you go.
   --configuration=Release` (restore + build + test), the exact CI pipeline.
 - Docs changes also require `cd website && npm run build` (`onBrokenLinks:
   "throw"`).
+- The `release` pipeline additionally runs `tests/Heimdall.SmokeTests` against a
+  live container talking to `api.nuget.org`; that suite is kept out of
+  `Heimdall.sln`, so the local `./init.sh` gate does not run it.
 - **Verification Evidence is mandatory:** record the command and its output
   (e.g. `./init.sh` → green, N tests) in `progress.md` before claiming a
   feature done. No green run, no "done". A red run means fix the root cause —

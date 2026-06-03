@@ -52,23 +52,8 @@ Common operator changes:
 `HEIMDALL_*` environment variables also override Serilog config — useful for
 flipping debug logging in production without redeploying.
 
-## Request logging
-
-`UseSerilogRequestLogging()` is always registered. Each request emits one
-structured log entry with method, path, status code, elapsed milliseconds, and
-the user-agent header. Sample (formatted):
-
-```json
-{
-  "@t": "2026-05-11T12:34:56.789Z",
-  "@l": "Information",
-  "@mt": "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms",
-  "RequestMethod": "GET",
-  "RequestPath": "/nuget/strict/v3/index.json",
-  "StatusCode": 200,
-  "Elapsed": 5.31
-}
-```
+A structured entry is also emitted per HTTP request (method, path, status,
+elapsed); that behaviour is fixed in code and needs no configuration.
 
 ## Audit log
 
@@ -85,5 +70,5 @@ heimdall:
       enabled: true   # default
 ```
 
-When disabled, no audit lines are emitted, but request logging continues
-unchanged.
+When disabled, no audit lines are emitted; the per-request log entries are
+unaffected.
