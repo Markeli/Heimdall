@@ -20,4 +20,18 @@ public interface IVersionListFilter
 		IEnumerable<PackageVersionMetadata> metas,
 		FeedConfig feed,
 		DateTimeOffset nowUtc);
+
+	/// <summary>
+	/// Applies pre-built rules to each version and returns only the allowed ones. Use this overload to
+	/// reuse a single rule set across many calls (e.g. one per search hit) instead of rebuilding — and
+	/// recompiling glob regexes — on every call.
+	/// </summary>
+	/// <param name="metas">Candidate versions.</param>
+	/// <param name="rules">Rules to evaluate, already materialised.</param>
+	/// <param name="ctx">Evaluation context (feed, ecosystem, current time).</param>
+	/// <returns>The subset of versions that all rules allow, in the original order.</returns>
+	IReadOnlyList<PackageVersionMetadata> Apply(
+		IEnumerable<PackageVersionMetadata> metas,
+		IReadOnlyList<IRule> rules,
+		RuleContext ctx);
 }

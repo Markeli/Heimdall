@@ -85,22 +85,24 @@ Standard NuGet search. Query parameters:
 |---|---|---|
 | `q` | string | Search term. May be empty for "list all". |
 | `skip` | int | Pagination offset. |
-| `take` | int | Page size. Non-positive values default to `heimdall.server.search.defaultTake` (default 20). |
+| `take` | int | Page size. Non-positive values default to `heimdall.server.search.defaultTake` (default 20); values above `heimdall.server.search.maxTake` (default 100) are clamped. |
 | `prerelease` | bool | When `true`, include prerelease versions. |
 
 The response is the upstream search response with rejected versions filtered
 out and `@id` URLs rewritten. Each hit's surviving versions are ordered by
 semantic version, and the hit's primary `version` is recomputed as the latest
-survivor — the highest stable version, or the highest prerelease when no stable
-version survives. A hit whose every version is filtered out is dropped from the
-results.
+survivor: the highest stable version, falling back to the highest prerelease —
+or, when the query passed `prerelease=true`, simply the highest version overall.
+A hit whose every version is filtered out is dropped from the results, but the
+response's `totalHits` preserves the upstream's global total so paging still
+works.
 
 Because NuGet search hits carry no per-version publish dates, Heimdall enriches
 each hit with the dates from that package's registration index before filtering,
 so date-based rules (e.g. `minAgeDays`) apply to search exactly as they do to
-the versions list and registration endpoints. The parallelism of that
-enrichment is bounded by
-[`search.maxConcurrentRegistrationFetches`](../configuration/server.md).
+the versions list and registration endpoints. Enrichment is skipped for feeds
+without a date-based rule, and its parallelism is bounded by
+[`search.maxConcurrentEnrichmentFetches`](../configuration/server.md).
 
 ```sh
 curl -fsSL 'http://localhost:8080/nuget/strict/v3/query?q=Newtonsoft.Json&take=3'

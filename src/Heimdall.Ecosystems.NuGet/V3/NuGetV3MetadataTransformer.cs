@@ -88,9 +88,10 @@ public sealed class NuGetV3MetadataTransformer
 		ArgumentNullException.ThrowIfNull(feed);
 
 		var metas = NuGetV3MetadataProjection.ToVersionMetadata(registration);
-		var passed = new HashSet<string>(
-			_filter.Apply(metas, feed, _time.GetUtcNow()).Select(m => m.Coords.Version.ToString()),
-			StringComparer.OrdinalIgnoreCase);
+		// Match on the parsed SemVersion, not its string form: the filter's survivor set and the
+		// upstream leaf may spell the same version differently ("1.0" vs "1.0.0"), so a string
+		// comparison would silently drop versions that actually passed the filter.
+		var passed = new HashSet<SemVersion>(_filter.Apply(metas, feed, _time.GetUtcNow()).Select(m => m.Coords.Version));
 
 		var packageId = registration.Items
 			.FirstOrDefault()?.Items?
@@ -103,7 +104,9 @@ public sealed class NuGetV3MetadataTransformer
 			Items = [],
 		};
 
-		var keptLeaves = new List<RegistrationLeafV3>();
+		// Parse each surviving leaf's version once so we can both match the filter set and order by
+		// semantic version without re-parsing.
+		var kept = new List<(RegistrationLeafV3 Leaf, SemVersion Version)>();
 		foreach (var page in registration.Items)
 		{
 			if (page.Items is null)
@@ -114,14 +117,16 @@ public sealed class NuGetV3MetadataTransformer
 			foreach (var leaf in page.Items)
 			{
 				var entry = leaf.CatalogEntryV3;
-				if (entry is null || !passed.Contains(entry.Version))
+				if (entry is null ||
+					!SemVersion.TryParse(entry.Version, SemVersionStyles.Any, out var version) ||
+					!passed.Contains(version))
 				{
 					continue;
 				}
 
 				// Every @id and packageContent URL is rewritten so that clients fetch through Heimdall
 				// rather than following links back to nuget.org directly.
-				keptLeaves.Add(new RegistrationLeafV3
+				var rewrittenLeaf = new RegistrationLeafV3
 				{
 					Id = _urls.RegistrationLeafV3(feed.Name, entry.PackageId, entry.Version).ToString(),
 					CatalogEntryV3 = new CatalogEntryV3
@@ -134,21 +139,22 @@ public sealed class NuGetV3MetadataTransformer
 						PackageContent = _urls.PackageContent(feed.Name, entry.PackageId, entry.Version).ToString(),
 					},
 					PackageContent = _urls.PackageContent(feed.Name, entry.PackageId, entry.Version).ToString(),
-				});
+				};
+				kept.Add((rewrittenLeaf, version));
 			}
 		}
 
-		if (keptLeaves.Count == 0)
+		if (kept.Count == 0)
 		{
 			// Every version was filtered out — signal "not found" so the controller returns 404.
 			return null;
 		}
 
 		// Order by semantic version rather than trusting upstream order, so lower/upper are the
-		// true min/max of the surviving set. Versions here are guaranteed parseable (they survived
-		// the filter, which only sees parseable versions from the projection).
-		keptLeaves = keptLeaves
-			.OrderBy(l => SemVersion.Parse(l.CatalogEntryV3!.Version, SemVersionStyles.Any), VersionOrdering.Ascending)
+		// true min/max of the surviving set.
+		var keptLeaves = kept
+			.OrderBy(x => x.Version, VersionOrdering.Ascending)
+			.Select(x => x.Leaf)
 			.ToList();
 
 		var first = keptLeaves[0].CatalogEntryV3!.Version;
@@ -175,6 +181,11 @@ public sealed class NuGetV3MetadataTransformer
 	/// </summary>
 	/// <param name="upstream">Raw upstream search result.</param>
 	/// <param name="feed">Feed configuration whose filter rules and name apply.</param>
+	/// <param name="includePrerelease">
+	/// Whether the originating query requested prereleases; when <c>true</c> the recomputed primary
+	/// version may be a prerelease, matching NuGet's contract that the hit version is the latest
+	/// respecting the prerelease parameter.
+	/// </param>
 	/// <param name="enrichedByPackageId">
 	/// Optional per-package version metadata (with publish dates) sourced from the registration index,
 	/// keyed by package id (case-insensitive). Used so date-based rules filter search results the same
@@ -186,10 +197,17 @@ public sealed class NuGetV3MetadataTransformer
 	public string RewriteSearch(
 		SearchResultV3 upstream,
 		FeedConfig feed,
+		IReadOnlyList<IRule> rules,
+		bool includePrerelease = false,
 		IReadOnlyDictionary<string, IReadOnlyList<PackageVersionMetadata>>? enrichedByPackageId = null)
 	{
 		ArgumentNullException.ThrowIfNull(upstream);
 		ArgumentNullException.ThrowIfNull(feed);
+		ArgumentNullException.ThrowIfNull(rules);
+
+		// Build the evaluation context once and reuse the pre-built rules across every hit, so glob
+		// regexes are not recompiled per hit.
+		var ctx = new RuleContext(feed.Ecosystem, feed.Name, _time.GetUtcNow());
 
 		var passedHits = new List<SearchHitV3>();
 		foreach (var hit in upstream.Data)
@@ -199,21 +217,21 @@ public sealed class NuGetV3MetadataTransformer
 					? enriched
 					: HitToMetadata(hit);
 
-			var passed = new HashSet<string>(
-				_filter.Apply(metas, feed, _time.GetUtcNow()).Select(m => m.Coords.Version.ToString()),
-				StringComparer.OrdinalIgnoreCase);
+			// Match on the parsed SemVersion rather than its string form so non-canonical upstream
+			// version strings ("1.0" vs "1.0.0") are not silently dropped.
+			var passed = new HashSet<SemVersion>(_filter.Apply(metas, rules, ctx).Select(m => m.Coords.Version));
 
 			// Keep the hit's own version entries (they carry the download counts) that survived the
-			// filter. Pair each with parsed metadata for semantic-version ordering and latest selection.
-			var kept = new List<(SearchVersionV3 Entry, PackageVersionMetadata Meta)>();
+			// filter. Pair each with the parsed version for semantic-version ordering and latest selection.
+			var kept = new List<(SearchVersionV3 Entry, SemVersion Version)>();
 			foreach (var v in hit.Versions)
 			{
-				if (!passed.Contains(v.Version) ||
-					!SemVersion.TryParse(v.Version, SemVersionStyles.Any, out var sv))
+				if (!SemVersion.TryParse(v.Version, SemVersionStyles.Any, out var version) ||
+					!passed.Contains(version))
 				{
 					continue;
 				}
-				kept.Add((v, PackageVersionMetadata.Create(new PackageCoordinates("nuget", hit.PackageId, sv), null)));
+				kept.Add((v, version));
 			}
 
 			if (kept.Count == 0)
@@ -223,11 +241,13 @@ public sealed class NuGetV3MetadataTransformer
 
 			// Recompute the primary "version" over the survivors instead of trusting the upstream's
 			// pick, which may have been filtered out. Map back to the entry's original version string.
-			var latest = VersionOrdering.SelectLatest(kept.Select(k => k.Meta))!;
-			var primary = kept.First(k => ReferenceEquals(k.Meta, latest)).Entry.Version;
+			var latest = VersionOrdering.SelectLatest(
+				kept.Select(k => PackageVersionMetadata.Create(new PackageCoordinates("nuget", hit.PackageId, k.Version), null)),
+				includePrerelease)!;
+			var primary = kept.First(k => k.Version.Equals(latest.Coords.Version)).Entry.Version;
 
 			var orderedVersions = kept
-				.OrderBy(k => k.Meta.Coords.Version, VersionOrdering.Ascending)
+				.OrderBy(k => k.Version, VersionOrdering.Ascending)
 				.Select(k => new SearchVersionV3
 				{
 					Version = k.Entry.Version,
@@ -249,7 +269,9 @@ public sealed class NuGetV3MetadataTransformer
 
 		var rewritten = new SearchResultV3
 		{
-			TotalHits = passedHits.Count,
+			// Preserve the upstream's global total so clients can still paginate; collapsing it to the
+			// surviving-hits-on-this-page count would truncate search to a single page.
+			TotalHits = upstream.TotalHits,
 			Data = passedHits,
 		};
 

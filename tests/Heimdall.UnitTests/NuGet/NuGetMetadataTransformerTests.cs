@@ -33,6 +33,12 @@ public class NuGetV3MetadataTransformerTests
 		return (transformer, feed);
 	}
 
+	private static IReadOnlyList<IRule> RulesFor(FeedConfig feed)
+	{
+		var sp = new ServiceCollection().AddHeimdallCore().BuildServiceProvider();
+		return sp.GetRequiredService<IRuleFactory>().BuildRules(feed.Rules);
+	}
+
 	private static RegistrationIndexV3 SampleRegistration() => new()
 	{
 		Id = "https://upstream/registration/newtonsoft.json/index.json",
@@ -176,7 +182,7 @@ public class NuGetV3MetadataTransformerTests
 		var enriched = EnrichedFor(
 			"Foo", ("1.0.0", 100), ("2.0.0", 50), ("2.1.0-rc", 40), ("3.0.0", 2));
 
-		var json = transformer.RewriteSearch(result, feed, enriched);
+		var json = transformer.RewriteSearch(result, feed, RulesFor(feed), includePrerelease: false, enriched);
 
 		using var doc = JsonDocument.Parse(json);
 		var data = doc.RootElement.GetProperty("data");
@@ -204,10 +210,102 @@ public class NuGetV3MetadataTransformerTests
 		var result = new SearchResultV3 { TotalHits = 1, Data = [hit] };
 
 		// No enrichment → date-less metadata → minAgeDays denies everything → hit dropped.
-		var json = transformer.RewriteSearch(result, feed);
+		var json = transformer.RewriteSearch(result, feed, RulesFor(feed));
 
 		using var doc = JsonDocument.Parse(json);
 		doc.RootElement.GetProperty("data").GetArrayLength().Should().Be(0);
+	}
+
+	[Fact]
+	public void Search_with_prerelease_allows_prerelease_as_primary()
+	{
+		var (transformer, feed) = Build(minAgeDays: 14);
+		var hit = new SearchHitV3
+		{
+			PackageId = "Foo",
+			Version = "2.1.0-rc",
+			Versions =
+			[
+				new SearchVersionV3 { Version = "1.0.0", Downloads = 1 },
+				new SearchVersionV3 { Version = "2.0.0", Downloads = 1 },
+				new SearchVersionV3 { Version = "2.1.0-rc", Downloads = 1 },
+			],
+		};
+		var result = new SearchResultV3 { TotalHits = 1, Data = [hit] };
+		var enriched = EnrichedFor("Foo", ("1.0.0", 100), ("2.0.0", 50), ("2.1.0-rc", 40));
+
+		var json = transformer.RewriteSearch(result, feed, RulesFor(feed), includePrerelease: true, enriched);
+
+		using var doc = JsonDocument.Parse(json);
+		// With prerelease requested, the newest survivor (the prerelease) is the primary.
+		doc.RootElement.GetProperty("data")[0].GetProperty("version").GetString().Should().Be("2.1.0-rc");
+	}
+
+	[Fact]
+	public void Search_preserves_upstream_total_hits_when_a_hit_is_filtered_out()
+	{
+		var (transformer, feed) = Build(minAgeDays: 14);
+		var foo = new SearchHitV3
+		{
+			PackageId = "Foo", Version = "1.0.0",
+			Versions = [new SearchVersionV3 { Version = "1.0.0", Downloads = 1 }],
+		};
+		var bar = new SearchHitV3
+		{
+			PackageId = "Bar", Version = "9.0.0",
+			Versions = [new SearchVersionV3 { Version = "9.0.0", Downloads = 1 }],
+		};
+		var result = new SearchResultV3 { TotalHits = 5000, Data = [foo, bar] };
+		var enriched = new Dictionary<string, IReadOnlyList<PackageVersionMetadata>>(StringComparer.OrdinalIgnoreCase)
+		{
+			["Foo"] = MetasFor("Foo", ("1.0.0", 100)),
+			["Bar"] = MetasFor("Bar", ("9.0.0", 1)),   // too new → fully filtered
+		};
+
+		var json = transformer.RewriteSearch(result, feed, RulesFor(feed), includePrerelease: false, enriched);
+
+		using var doc = JsonDocument.Parse(json);
+		// Bar dropped from the page, but the global total is preserved so paging still works.
+		doc.RootElement.GetProperty("data").GetArrayLength().Should().Be(1);
+		doc.RootElement.GetProperty("totalHits").GetInt32().Should().Be(5000);
+	}
+
+	[Fact]
+	public void Search_keeps_non_canonical_version_strings()
+	{
+		var (transformer, feed) = Build(minAgeDays: 14);
+		var hit = new SearchHitV3
+		{
+			PackageId = "Foo", Version = "1.0",
+			Versions = [new SearchVersionV3 { Version = "1.0", Downloads = 1 }],
+		};
+		var result = new SearchResultV3 { TotalHits = 1, Data = [hit] };
+		// Registration spells it "1.0.0"; the hit spells it "1.0" — they must still match.
+		var enriched = EnrichedFor("Foo", ("1.0.0", 100));
+
+		var json = transformer.RewriteSearch(result, feed, RulesFor(feed), includePrerelease: false, enriched);
+
+		using var doc = JsonDocument.Parse(json);
+		var entry = doc.RootElement.GetProperty("data")[0];
+		entry.GetProperty("version").GetString().Should().Be("1.0");
+		entry.GetProperty("versions").EnumerateArray()
+			.Select(v => v.GetProperty("version").GetString()).Should().ContainInOrder("1.0");
+	}
+
+	[Fact]
+	public void Registration_keeps_non_canonical_version_strings()
+	{
+		var (transformer, feed) = Build(minAgeDays: 0);
+		// Upstream leaf carries a non-canonical "1.0"; it must survive (not be dropped to a 404).
+		var registration = RegistrationOf("Pkg", ("1.0", 30));
+
+		var json = transformer.RewriteRegistration(registration, feed);
+
+		json.Should().NotBeNull();
+		using var doc = JsonDocument.Parse(json!);
+		var leaves = doc.RootElement.GetProperty("items")[0].GetProperty("items").EnumerateArray().ToList();
+		leaves.Should().HaveCount(1);
+		leaves[0].GetProperty("catalogEntry").GetProperty("version").GetString().Should().Be("1.0");
 	}
 
 	private static RegistrationIndexV3 RegistrationOf(string id, params (string Version, int AgeDays)[] versions) => new()
@@ -223,19 +321,19 @@ public class NuGetV3MetadataTransformerTests
 		],
 	};
 
-	private static IReadOnlyDictionary<string, IReadOnlyList<PackageVersionMetadata>> EnrichedFor(
-		string id, params (string Version, int AgeDays)[] versions)
-	{
-		var metas = versions
+	private static IReadOnlyList<PackageVersionMetadata> MetasFor(
+		string id, params (string Version, int AgeDays)[] versions) => versions
 			.Select(v => PackageVersionMetadata.Create(
 				new PackageCoordinates("nuget", id, SemVersion.Parse(v.Version, SemVersionStyles.Any)),
 				Now.AddDays(-v.AgeDays)))
 			.ToList();
-		return new Dictionary<string, IReadOnlyList<PackageVersionMetadata>>(StringComparer.OrdinalIgnoreCase)
+
+	private static IReadOnlyDictionary<string, IReadOnlyList<PackageVersionMetadata>> EnrichedFor(
+		string id, params (string Version, int AgeDays)[] versions) =>
+		new Dictionary<string, IReadOnlyList<PackageVersionMetadata>>(StringComparer.OrdinalIgnoreCase)
 		{
-			[id] = metas,
+			[id] = MetasFor(id, versions),
 		};
-	}
 
 	private sealed class FixedTimeProvider : TimeProvider
 	{

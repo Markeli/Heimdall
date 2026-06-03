@@ -68,8 +68,45 @@ public sealed class NuGetV3UpstreamClient : INuGetV3UpstreamClient
 		resp.EnsureSuccessStatusCode();
 
 		await using var stream = await resp.Content.ReadAsStreamAsync(ct);
-		return await JsonSerializer.DeserializeAsync<RegistrationIndexV3>(stream, JsonOptions, ct)
-			;
+		var index = await JsonSerializer.DeserializeAsync<RegistrationIndexV3>(stream, JsonOptions, ct);
+		if (index is null)
+		{
+			return null;
+		}
+
+		await InlineExternalPagesAsync(index, http, ct);
+		return index;
+	}
+
+	// Large packages split versions across registration pages that carry only an @id and omit their
+	// leaves; the downstream projection skips null-Items pages, so we must fetch and inline them here
+	// or those versions silently disappear from every read path. A page fetch that fails is logged and
+	// left null (degrade, don't fail the whole request).
+	private async Task InlineExternalPagesAsync(RegistrationIndexV3 index, HttpClient http, CancellationToken ct)
+	{
+		foreach (var page in index.Items)
+		{
+			if (page.Items is not null || string.IsNullOrEmpty(page.Id))
+			{
+				continue;
+			}
+
+			try
+			{
+				using var resp = await http.GetAsync(new Uri(page.Id), ct);
+				resp.EnsureSuccessStatusCode();
+				await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+				var fetched = await JsonSerializer.DeserializeAsync<RegistrationPageV3>(stream, JsonOptions, ct);
+				page.Items = fetched?.Items;
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				_logger.LogWarning(
+					ex,
+					"Failed to inline external registration page {PageUrl}; its versions will be omitted",
+					page.Id);
+			}
+		}
 	}
 
 	/// <inheritdoc />

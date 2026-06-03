@@ -276,6 +276,22 @@ public class HeimdallEndToEndTests : IDisposable
 	}
 
 	[Fact]
+	public async Task Search_take_is_clamped_to_max()
+	{
+		using var factory = CreateFactory();
+		using var client = factory.CreateClient();
+
+		var resp = await client.GetAsync("/nuget/strict/v3/query?q=foo&take=100000");
+		resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+		// The forwarded upstream query must carry the clamped take (default MaxTake = 100), not 100000,
+		// so one request cannot fan out into an unbounded number of enrichment fetches.
+		var queryEntry = _upstream.LogEntries.Last(e => e.RequestMessage.Path == "/v3/query");
+		queryEntry.RequestMessage.Query!["take"].Should().Contain("100");
+		queryEntry.RequestMessage.Query!["take"].Should().NotContain("100000");
+	}
+
+	[Fact]
 	public async Task Versions_list_returns_404_when_all_versions_filtered()
 	{
 		using var factory = CreateFactory();

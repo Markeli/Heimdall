@@ -26,6 +26,37 @@ work — this file just records *in-flight* state and the next concrete step.
 
 ---
 
+## 2026-06-03 — Code-review fixes for #19
+
+- **Current State:** All confirmed code-review findings on PR #21 fixed on
+  `feature/#8-filter-latest-nuget`. Verified locally.
+- **What changed:**
+  - Registration: external (`items:null`) pages now fetched + inlined in
+    `NuGetV3UpstreamClient.GetRegistrationAsync` (no more dropped versions / false 404).
+  - Version matching now keyed on parsed `SemVersion`, not its string form
+    (non-canonical `1.0`/`v1.2.3` survive); removed double-parse and
+    `ReferenceEquals` fragility.
+  - Search `totalHits` preserves the upstream total (paging no longer truncated).
+  - `take` clamped to new `Server.Search.MaxTake` (default 100); enrichment cap
+    renamed `MaxConcurrentRegistrationFetches` → `MaxConcurrentEnrichmentFetches`
+    (default `Environment.ProcessorCount`).
+  - Enrichment `catch` narrowed (HttpRequestException/JsonException/timeout;
+    caller-cancel rethrown; other exceptions propagate) + failure metric
+    (`heimdall_search_enrichment_failures` via BCL Meter, bridged to Prometheus).
+  - `IRule.RequiresPublishedDate` capability: enrichment skipped for feeds
+    without date rules; feed rules built once per search (no per-hit regex
+    recompile) via new `IVersionListFilter.Apply(metas, rules, ctx)` overload.
+  - `prerelease=true` now yields a prerelease primary; `SelectLatest` uses
+    precedence comparer (ignores build metadata).
+  - Tests added (semver matching, totalHits, prerelease, paging inline,
+    take-clamp, validator); CHANGELOG + docs updated.
+  - Deferred (follow-up, not this PR): explicit result type for the
+    `null → 404` contract (#14).
+- **Next:** Commit + push to PR #21; address any further review.
+- **Verification Evidence:** `./init.sh` → GREEN: 0 warnings/errors,
+  Heimdall.UnitTests 71 passed, Heimdall.IntegrationTests 14 passed.
+  `cd website && npm run build` → SUCCESS (onBrokenLinks: throw).
+
 ## 2026-05-31 — Filter latest versions (#19)
 
 - **Current State:** Feature `filter-latest-versions` (#19) `in_progress` on

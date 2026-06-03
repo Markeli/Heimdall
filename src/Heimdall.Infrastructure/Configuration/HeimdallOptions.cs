@@ -63,11 +63,19 @@ public sealed class SearchOptions
 	public int DefaultTake { get; set; } = 20;
 
 	/// <summary>
-	/// Maximum number of registration documents fetched concurrently when enriching a single search
-	/// response page with publish dates. Bounds the upstream/thread-pool fan-out per request so search
-	/// stays scalable under load. Must be <c>&gt;= 1</c> (validated by <see cref="HeimdallOptionsValidator"/>).
+	/// Upper bound applied to a client-supplied <c>take</c>. Since each returned hit triggers a metadata
+	/// enrichment fetch, an unbounded <c>take</c> would let one request fan out arbitrarily many upstream
+	/// calls; this caps that. Must be <c>&gt;= 1</c> (validated by <see cref="HeimdallOptionsValidator"/>).
 	/// </summary>
-	public int MaxConcurrentRegistrationFetches { get; set; } = 8;
+	public int MaxTake { get; set; } = 100;
+
+	/// <summary>
+	/// Maximum number of metadata documents fetched concurrently when enriching a single search response
+	/// page with publish dates. Bounds the upstream/thread-pool fan-out per request so search stays
+	/// scalable under load. Defaults to the host's processor count. Must be <c>&gt;= 1</c> (validated by
+	/// <see cref="HeimdallOptionsValidator"/>).
+	/// </summary>
+	public int MaxConcurrentEnrichmentFetches { get; set; } = Environment.ProcessorCount;
 }
 
 /// <summary>Container for L1 and L2 cache strand settings.</summary>

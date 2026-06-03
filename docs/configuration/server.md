@@ -18,7 +18,9 @@ heimdall:
       knownNetworks: []                   # CIDR networks to trust
     search:
       defaultTake: 20                     # default page size for /query
-      maxConcurrentRegistrationFetches: 8 # cap on parallel registration fetches per search page
+      maxTake: 100                        # upper clamp on a client-supplied take
+      maxConcurrentEnrichmentFetches: 8   # cap on parallel enrichment fetches per search page
+                                          # (defaults to the host processor count)
 ```
 
 ## Keys
@@ -69,12 +71,20 @@ blindly trusting forwarded values.
 Default page size for the `query` endpoint when the client omits or passes a
 non-positive `take`. Constrained to `1..100` by the validator. Default `20`.
 
-### `search.maxConcurrentRegistrationFetches`
+### `search.maxTake`
+
+Upper bound applied to a client-supplied `take`. Because each returned hit can
+trigger a metadata enrichment fetch, an unbounded `take` would let a single
+request fan out into arbitrarily many upstream calls; this caps it. A `take`
+above `maxTake` is clamped down. Must be `>= 1`. Default `100`.
+
+### `search.maxConcurrentEnrichmentFetches`
 
 NuGet search results carry no per-version publish dates, so to apply date-based
 rules (such as `minAgeDays`) consistently Heimdall enriches each search hit with
-the publish dates from that package's registration index. Those registration
-documents are fetched concurrently and served from the same cache as the
-metadata endpoints; this key bounds how many run in parallel for a single search
-page, keeping the upstream and thread-pool fan-out in check under load. Must be
-`>= 1`. Default `8`.
+the publish dates from that package's registration index. (Enrichment is skipped
+entirely for feeds that have no date-based rule.) Those registration documents
+are fetched concurrently and served from the same cache as the metadata
+endpoints; this key bounds how many run in parallel for a single search page,
+keeping the upstream and thread-pool fan-out in check under load. Must be
+`>= 1`. Defaults to the host's processor count (`Environment.ProcessorCount`).

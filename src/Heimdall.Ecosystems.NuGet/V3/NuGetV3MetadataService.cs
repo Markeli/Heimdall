@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Filtering;
 using Heimdall.Core.Packages;
 using Heimdall.Ecosystems.NuGet.V3.Models;
 using Heimdall.Infrastructure.Configuration;
@@ -26,6 +27,7 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 	private readonly NuGetV3UrlRewriter _urls;
 	private readonly IOptionsMonitor<HeimdallOptions> _options;
 	private readonly ILogger<NuGetV3MetadataService> _logger;
+	private readonly IRuleFactory _ruleFactory;
 
 	/// <summary>
 	/// Creates a new <see cref="NuGetV3MetadataService"/>.
@@ -38,6 +40,7 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 	/// <param name="urls">Heimdall-facing URL rewriter.</param>
 	/// <param name="options">Live options monitor used to read the search enrichment concurrency cap.</param>
 	/// <param name="logger">Logger used to surface registration-enrichment failures during search.</param>
+	/// <param name="ruleFactory">Factory used to materialise a feed's rules once per search request.</param>
 	/// <exception cref="ArgumentNullException">Thrown when any dependency is null.</exception>
 	public NuGetV3MetadataService(
 		IFeedConfigLookup lookup,
@@ -47,7 +50,8 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 		NuGetV3MetadataTransformer transformer,
 		NuGetV3UrlRewriter urls,
 		IOptionsMonitor<HeimdallOptions> options,
-		ILogger<NuGetV3MetadataService> logger)
+		ILogger<NuGetV3MetadataService> logger,
+		IRuleFactory ruleFactory)
 	{
 		ArgumentNullException.ThrowIfNull(lookup);
 		ArgumentNullException.ThrowIfNull(snapshots);
@@ -57,6 +61,7 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 		ArgumentNullException.ThrowIfNull(urls);
 		ArgumentNullException.ThrowIfNull(options);
 		ArgumentNullException.ThrowIfNull(logger);
+		ArgumentNullException.ThrowIfNull(ruleFactory);
 
 		_lookup = lookup;
 		_snapshots = snapshots;
@@ -66,6 +71,7 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 		_urls = urls;
 		_options = options;
 		_logger = logger;
+		_ruleFactory = ruleFactory;
 	}
 
 	/// <inheritdoc />
@@ -144,11 +150,15 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 			return null;
 		}
 
-		// Search hits carry no publish dates, so date-based rules (e.g. minAgeDays) cannot be applied
-		// to them directly. Enrich each hit with the registration metadata Heimdall already caches so
-		// search filters consistently with the specific-package endpoints.
-		var enriched = await EnrichSearchHitsAsync(feedName, result, ct);
-		return _transformer.RewriteSearch(result, feed, enriched);
+		// Build the feed's rules once for the whole page (reused across hits, so glob regexes are not
+		// recompiled per hit). Search hits carry no publish dates, so enrichment from the cached
+		// registration is only needed when a rule actually requires dates — skip it otherwise.
+		var rules = _ruleFactory.BuildRules(feed.Rules);
+		var enriched = rules.Any(rule => rule.RequiresPublishedDate)
+			? await EnrichSearchHitsAsync(feedName, result, ct)
+			: null;
+
+		return _transformer.RewriteSearch(result, feed, rules, includePrerelease, enriched);
 	}
 
 	private async Task<IReadOnlyDictionary<string, IReadOnlyList<PackageVersionMetadata>>> EnrichSearchHitsAsync(
@@ -171,7 +181,7 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 		// The cap is configurable so it can be tuned to the deployment's upstream/thread-pool budget.
 		var parallelOptions = new ParallelOptions
 		{
-			MaxDegreeOfParallelism = Math.Max(1, _options.CurrentValue.Server.Search.MaxConcurrentRegistrationFetches),
+			MaxDegreeOfParallelism = Math.Max(1, _options.CurrentValue.Server.Search.MaxConcurrentEnrichmentFetches),
 			CancellationToken = ct,
 		};
 
@@ -185,10 +195,20 @@ public sealed class NuGetV3MetadataService : INuGetV3MetadataService
 					enriched[packageId] = NuGetV3MetadataProjection.ToVersionMetadata(registration);
 				}
 			}
-			catch (Exception ex) when (ex is not OperationCanceledException)
+			catch (OperationCanceledException) when (ct.IsCancellationRequested)
 			{
-				// On failure the transformer falls back to date-less hit metadata, which drops the hit
-				// under date-based rules. Log so the silent omission is observable rather than mysterious.
+				// Genuine caller cancellation — abort the whole search rather than swallowing it.
+				throw;
+			}
+			catch (Exception ex) when (ex is HttpRequestException or JsonException or OperationCanceledException)
+			{
+				// Expected enrichment failure: upstream error, malformed registration JSON, or a per-fetch
+				// timeout surfacing as a canceled task while the caller's token is NOT canceled. The
+				// transformer then falls back to date-less hit metadata, which drops the hit under
+				// date-based rules — record it (metric + log) so the silent omission is observable.
+				// Unexpected exceptions are intentionally NOT caught here: they propagate and fail the
+				// request loudly instead of masquerading as a transient flake.
+				NuGetSearchMetrics.EnrichmentFailures.Add(1);
 				_logger.LogWarning(
 					ex,
 					"Failed to enrich search hit {PackageId} on feed {Feed} from registration; "

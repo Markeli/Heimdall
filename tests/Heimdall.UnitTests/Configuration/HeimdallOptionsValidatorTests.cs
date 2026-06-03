@@ -116,14 +116,27 @@ public class HeimdallOptionsValidatorTests
 	[Theory]
 	[InlineData(0)]
 	[InlineData(-1)]
-	public void Search_max_concurrent_registration_fetches_below_one_fails(int value)
+	public void Search_max_concurrent_enrichment_fetches_below_one_fails(int value)
 	{
 		var validator = new HeimdallOptionsValidator();
 		var opts = Valid();
-		opts.Server.Search.MaxConcurrentRegistrationFetches = value;
+		opts.Server.Search.MaxConcurrentEnrichmentFetches = value;
 		var result = validator.Validate(null, opts);
 		result.Failed.Should().BeTrue();
-		result.FailureMessage.Should().Contain("maxConcurrentRegistrationFetches");
+		result.FailureMessage.Should().Contain("maxConcurrentEnrichmentFetches");
+	}
+
+	[Theory]
+	[InlineData(0)]
+	[InlineData(-1)]
+	public void Search_max_take_below_one_fails(int value)
+	{
+		var validator = new HeimdallOptionsValidator();
+		var opts = Valid();
+		opts.Server.Search.MaxTake = value;
+		var result = validator.Validate(null, opts);
+		result.Failed.Should().BeTrue();
+		result.FailureMessage.Should().Contain("maxTake");
 	}
 
 	[Fact]

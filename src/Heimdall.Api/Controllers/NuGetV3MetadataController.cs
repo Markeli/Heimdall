@@ -140,9 +140,16 @@ public sealed class NuGetV3MetadataController : ControllerBase
 			return Problem(statusCode: 404, title: "Unknown feed");
 		}
 
+		var search = _options.CurrentValue.Server.Search;
 		if (take <= 0)
 		{
-			take = _options.CurrentValue.Server.Search.DefaultTake;
+			take = search.DefaultTake;
+		}
+		else if (take > search.MaxTake)
+		{
+			// Each hit triggers a metadata enrichment fetch, so an unbounded take would amplify one
+			// request into arbitrarily many upstream calls. Clamp it.
+			take = search.MaxTake;
 		}
 
 		var json = await _service.SearchJsonAsync(feed, query, skip, take, prerelease, ct);

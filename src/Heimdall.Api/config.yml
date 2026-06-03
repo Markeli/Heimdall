@@ -3,7 +3,8 @@ heimdall:
     listen: "http://0.0.0.0:8080"
     publicBaseUrl: "http://localhost:8080"
     search:
-      maxConcurrentRegistrationFetches: 8
+      maxTake: 100                          # upper clamp on client-supplied take
+      # maxConcurrentEnrichmentFetches: defaults to Environment.ProcessorCount
   cache:
     l1:
       defaultTtl: "00:05:00"

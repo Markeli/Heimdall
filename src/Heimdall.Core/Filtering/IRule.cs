@@ -12,6 +12,14 @@ public interface IRule
 	string Name { get; }
 
 	/// <summary>
+	/// Whether this rule needs <see cref="PackageVersionMetadata.PublishedUtc"/> to evaluate. Metadata
+	/// sources that lack publish dates (e.g. NuGet search hits) must be enriched before such a rule can
+	/// be applied; callers use this to skip that enrichment entirely when no active rule needs dates.
+	/// Defaults to <c>false</c>.
+	/// </summary>
+	bool RequiresPublishedDate => false;
+
+	/// <summary>
 	/// Evaluates the rule against a single package version.
 	/// </summary>
 	/// <param name="meta">Metadata of the version under evaluation.</param>

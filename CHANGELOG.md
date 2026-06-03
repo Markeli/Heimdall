@@ -12,9 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   endpoints. Search hits carry no publish dates, so date-based rules (e.g.
   `minAgeDays`) previously denied every version in search; Heimdall now enriches
   each hit with the publish dates from the cached registration index before
-  filtering. The per-page registration fan-out is bounded by the new
-  `heimdall.server.search.maxConcurrentRegistrationFetches` setting (default
-  `8`, must be `>= 1`). Closes #19.
+  filtering — but only when a feed actually has a date-based rule, so feeds
+  without one (e.g. `allowDeny`-only) pay no extra fetches. The enrichment
+  fan-out is bounded by the new `heimdall.server.search.maxConcurrentEnrichmentFetches`
+  setting (default: the host processor count, must be `>= 1`), and a
+  client-supplied `take` is clamped to `heimdall.server.search.maxTake`
+  (default `100`) so a single query cannot fan out unboundedly. Closes #19.
 - `minAgeDays` rule now accepts an optional `exclude` parameter — a `;`- or
   newline-separated list of glob patterns matched case-insensitively against
   the package ID. Matching packages bypass the age check (and the
@@ -64,8 +67,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `version` is the highest stable survivor (falling back to the highest
   prerelease), and the flat-container versions list and registration
   `lower`/`upper` are ordered by semantic version instead of lexicographically
-  (so `2.0.0` sorts before `10.0.0`). Requesting a specific package whose every
-  version is filtered out now returns `404` instead of an empty document.
+  (so `2.0.0` sorts before `10.0.0`). For a search with `prerelease=true`, the
+  primary `version` may be a prerelease, matching NuGet's contract. Requesting a
+  specific package whose every version is filtered out now returns `404` instead
+  of an empty document.
+- Registration indexes whose pages are served externally (the large-package
+  shape, where a page carries only an `@id` and omits its leaves) are now
+  fetched and inlined, so versions on those pages are no longer silently dropped
+  from listings, registration, and search.
+- Version matching between the filter and the upstream documents is now done on
+  the parsed semantic version rather than its string form, so non-canonical
+  upstream version strings (e.g. `1.0`, `v1.2.3`) are no longer dropped.
 
 ### Security
 - Pin `serialize-javascript` to `^7.0.5` in `website/` via an npm `overrides`

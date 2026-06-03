@@ -39,6 +39,19 @@ public sealed class VersionListFilter : IVersionListFilter
 
 		var rules = _factory.BuildRules(feed.Rules);
 		var ctx = new RuleContext(feed.Ecosystem, feed.Name, nowUtc);
+		return Apply(metas, rules, ctx);
+	}
+
+	/// <inheritdoc />
+	/// <exception cref="ArgumentNullException">A required argument is <c>null</c>.</exception>
+	public IReadOnlyList<PackageVersionMetadata> Apply(
+		IEnumerable<PackageVersionMetadata> metas,
+		IReadOnlyList<IRule> rules,
+		RuleContext ctx)
+	{
+		ArgumentNullException.ThrowIfNull(metas);
+		ArgumentNullException.ThrowIfNull(rules);
+		ArgumentNullException.ThrowIfNull(ctx);
 
 		var passed = new List<PackageVersionMetadata>();
 		foreach (var meta in metas)

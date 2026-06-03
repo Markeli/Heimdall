@@ -57,6 +57,9 @@ public sealed class MinAgeDaysRule : IRule
 	public string Name => RuleName;
 
 	/// <inheritdoc />
+	public bool RequiresPublishedDate => true;
+
+	/// <inheritdoc />
 	/// <exception cref="ArgumentNullException"><paramref name="meta"/> is <c>null</c>.</exception>
 	public RuleVerdict Evaluate(PackageVersionMetadata meta, RuleContext ctx)
 	{

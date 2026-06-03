@@ -70,6 +70,9 @@ if (forwarded.KnownProxies.Count > 0 || forwarded.KnownNetworks.Count > 0)
 app.UseExceptionHandler();
 app.UseSerilogRequestLogging();
 app.UseHttpMetrics();
+// Bridge System.Diagnostics.Metrics meters (e.g. Heimdall.Ecosystems.NuGet) onto the Prometheus
+// endpoint so domain counters surface alongside the HTTP metrics.
+MeterAdapter.StartListening();
 app.MapControllers();
 app.MapMetrics();
 
