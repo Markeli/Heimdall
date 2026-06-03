@@ -8,9 +8,9 @@ history lives in `progress.md`, `CHANGELOG.md`, and git.
 > **Current Objective:** `docs-improvement` (issue #10). Docs reworked and
 > verified locally on branch `docs/improve-docs-issue-10`; changes are
 > uncommitted in the working tree.
-> **Recommended Next Step:** Get go-ahead to commit, then commit + open a PR
-> with `Closes #10`; fill the PR template. After merge, flip
-> `docs-improvement` → `done` in `feature_list.json`.
+> **Recommended Next Step:** PR [#22](https://github.com/Markeli/Heimdall/pull/22)
+> is open (`Closes #10`). Await CI + review; on merge, flip
+> `docs-improvement` → `done` in `feature_list.json` and `activeFeatureId` → null.
 
 ## Active feature
 
